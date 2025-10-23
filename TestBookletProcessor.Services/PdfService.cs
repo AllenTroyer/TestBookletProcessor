@@ -53,6 +53,9 @@ public class PdfService : IPdfService
             if (pdfPaths == null || pdfPaths.Count == 0)
                 throw new ArgumentException("No PDF files provided for merging.");
 
+            if (IsFileLocked(outputPath))
+                throw new IOException($"The file '{outputPath}' is locked by another process. Is it open in another application?");
+
             using var outputDocument = new PdfDocument();
 
             foreach (var pdfPath in pdfPaths)
@@ -154,5 +157,76 @@ public class PdfService : IPdfService
             document.Save(outputPath);
             Console.WriteLine($"Converted image to PDF: {imagePath} -> {outputPath}");
         });
+    }
+
+    public async Task<List<string>> SplitIntoBookletsAsync(string inputPdfPath, string templatePdfPath, string outputFolder)
+    {
+        return await Task.Run(() =>
+        {
+            using var inputDoc = PdfReader.Open(inputPdfPath, PdfDocumentOpenMode.Import);
+            using var templateDoc = PdfReader.Open(templatePdfPath, PdfDocumentOpenMode.Import);
+
+            int inputPages = inputDoc.PageCount;
+            int templatePages = templateDoc.PageCount;
+
+            if (inputPages % templatePages != 0)
+                throw new InvalidOperationException("Input PDF page count is not an exact multiple of the template PDF page count.");
+
+            Directory.CreateDirectory(outputFolder);
+            var bookletPaths = new List<string>();
+            int bookletCount = inputPages / templatePages;
+
+            for (int i = 0; i < bookletCount; i++)
+            {
+                string bookletPath = Path.Combine(outputFolder, $"booklet_{i + 1:D4}.pdf");
+                using var bookletDoc = new PdfDocument();
+                for (int j = 0; j < templatePages; j++)
+                {
+                    bookletDoc.AddPage(inputDoc.Pages[i * templatePages + j]);
+                }
+                bookletDoc.Save(bookletPath);
+                bookletPaths.Add(bookletPath);
+            }
+            return bookletPaths;
+        });
+    }
+
+    public async Task ProcessBookletsAsync(
+        string inputPdfPath,
+        string templatePdfPath,
+        string workingFolder,
+        string finalOutputPdf,
+        Func<string, Task<string>> processBookletAsync)
+    {
+        // 1. Split input PDF into booklets
+        var bookletFiles = await SplitIntoBookletsAsync(inputPdfPath, templatePdfPath, workingFolder);
+
+        // 2. Process each booklet file
+        var processedBookletFiles = new List<string>();
+        foreach (var bookletFile in bookletFiles)
+        {
+            // The delegate should process the booklet and return the path to the processed file
+            string processedFile = await processBookletAsync(bookletFile);
+            processedBookletFiles.Add(processedFile);
+        }
+
+        // 3. Merge processed booklets back into a single PDF
+        await MergePdfsAsync(processedBookletFiles, finalOutputPdf);
+    }
+
+    private bool IsFileLocked(string filePath)
+    {
+        if (!File.Exists(filePath))
+            return false;
+
+        try
+        {
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+            return false;
+        }
+        catch (IOException)
+        {
+            return true;
+        }
     }
 }

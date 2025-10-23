@@ -36,7 +36,21 @@ string templatePdf = Path.Combine(settings.TemplateFolder, "template.pdf");
 string inputPdf = Path.Combine(settings.InputFolder, "input.pdf");
 string workingFolder = Path.Combine(settings.OutputFolder, "booklet_work");
 string finalOutputPdf = Path.Combine(settings.OutputFolder, "final_output.pdf");
-await bookletProcessor.ProcessBookletAsync(templatePdf, inputPdf, workingFolder, finalOutputPdf);
+
+// Split input PDF into booklets
+var bookletPaths = await pdfService.SplitIntoBookletsAsync(inputPdf, templatePdf, Path.Combine(workingFolder, "booklets"));
+var processedBookletPaths = new List<string>();
+int bookletIndex =1;
+foreach (var bookletPath in bookletPaths)
+{
+ string bookletWorkingFolder = Path.Combine(workingFolder, $"booklet_{bookletIndex}");
+ string processedBookletOutput = Path.Combine(bookletWorkingFolder, "processed_booklet.pdf");
+ await bookletProcessor.ProcessBookletAsync(templatePdf, bookletPath, bookletWorkingFolder, processedBookletOutput);
+ processedBookletPaths.Add(processedBookletOutput);
+ bookletIndex++;
+}
+// Merge all processed booklets into the final output
+await pdfService.MergePdfsAsync(processedBookletPaths, finalOutputPdf);
 Console.WriteLine($"✓ Booklet processing completed: {finalOutputPdf}\n");
 
 //// Test PDF Service
