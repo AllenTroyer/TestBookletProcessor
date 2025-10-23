@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BouncyCastle.NetCore" Version="2.2.1" />
+    <PackageReference Include="itext7" Version="9.3.0" />
+    <PackageReference Include="itext7.commons" Version="9.3.0" />
+    <PackageReference Include="itext7.licensekey" Version="3.1.6" />
+    <PackageReference Include="PDFsharp" Version="6.2.2" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TestBookletProcessor.Core\TestBookletProcessor.Core.csproj" />
+  </ItemGroup>
+
+</Project>
