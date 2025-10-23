@@ -1,16 +1,17 @@
 ﻿using Docnet.Core;
 using Docnet.Core.Models;
+using PdfSharp.Drawing;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using TestBookletProcessor.Core.Interfaces;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Formats.Png;
 
 namespace TestBookletProcessor.Services;
 
@@ -101,7 +102,26 @@ public class PdfService : IPdfService
 
     public async Task ConvertImageToPdfAsync(string imagePath, string outputPath)
     {
-        await Task.CompletedTask;
-        Console.WriteLine($"[STUB] Converting image to PDF: {imagePath} -> {outputPath}");
+        await Task.Run(() =>
+        {
+            if (!File.Exists(imagePath))
+                throw new FileNotFoundException($"Input image not found: {imagePath}");
+
+            using var document = new PdfDocument();
+            var page = document.AddPage();
+
+            using var image = XImage.FromFile(imagePath);
+            page.Width = XUnit.FromPoint(image.PixelWidth * 72.0 / image.HorizontalResolution);
+            page.Height = XUnit.FromPoint(image.PixelHeight * 72.0 / image.VerticalResolution);
+
+            using (var gfx = XGraphics.FromPdfPage(page))
+            {
+                // Use .Point property to avoid obsolete implicit conversion
+                gfx.DrawImage(image, 0, 0, page.Width.Point, page.Height.Point);
+            }
+
+            document.Save(outputPath);
+            Console.WriteLine($"Converted image to PDF: {imagePath} -> {outputPath}");
+        });
     }
 }

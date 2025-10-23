@@ -64,6 +64,14 @@ string alignedImage = Path.Combine(settings.OutputFolder, "test_aligned.png");
 await imageProcessor.AlignImageAsync(alignInputImage, alignTemplateImage, alignedImage);
 Console.WriteLine($"✓ Aligned image saved to: {alignedImage}\n");
 
+// Test ConvertImageToPdfAsync
+Console.WriteLine("Testing ConvertImageToPdfAsync...");
+Console.WriteLine("─────────────────────────────────────────");
+string imageToConvert = Path.Combine(settings.InputFolder, "test_image.png");
+string pdfOutput = Path.Combine(settings.OutputFolder, "test_image_converted.pdf");
+await pdfService.ConvertImageToPdfAsync(imageToConvert, pdfOutput);
+Console.WriteLine($"✓ Image converted to PDF: {pdfOutput}\n");
+
 // Test Image Processor
 Console.WriteLine("Testing Image Processor (Stub)...");
 Console.WriteLine("─────────────────────────────────────────");

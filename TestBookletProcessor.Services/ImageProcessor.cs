@@ -114,6 +114,7 @@ public class ImageProcessor : IImageProcessor
         });
     }
 
+    // Stub method for skew angle detection, not needed in current implementation
     public async Task<Double> DetectSkewAngleAsync(string imagePath)
     {
         await Task.CompletedTask;
