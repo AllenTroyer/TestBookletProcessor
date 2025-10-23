@@ -48,8 +48,28 @@ public class PdfService : IPdfService
 
     public async Task MergePdfsAsync(List<string> pdfPaths, string outputPath)
     {
-        await Task.CompletedTask;
-        Console.WriteLine($"[STUB] Merging {pdfPaths.Count} PDFs to: {outputPath}");
+        await Task.Run(() =>
+        {
+            if (pdfPaths == null || pdfPaths.Count == 0)
+                throw new ArgumentException("No PDF files provided for merging.");
+
+            using var outputDocument = new PdfDocument();
+
+            foreach (var pdfPath in pdfPaths)
+            {
+                if (!File.Exists(pdfPath))
+                    throw new FileNotFoundException($"PDF file not found: {pdfPath}");
+
+                using var inputDocument = PdfReader.Open(pdfPath, PdfDocumentOpenMode.Import);
+                for (int idx = 0; idx < inputDocument.PageCount; idx++)
+                {
+                    outputDocument.AddPage(inputDocument.Pages[idx]);
+                }
+            }
+
+            outputDocument.Save(outputPath);
+            Console.WriteLine($"Merged {pdfPaths.Count} PDFs to: {outputPath}");
+        });
     }
 
     public async Task ConvertPageToImageAsync(string pdfPath, int pageNumber, string outputFolder)

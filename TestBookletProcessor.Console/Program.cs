@@ -37,6 +37,19 @@ var pages = await pdfService.SplitPdfAsync(
 );
 Console.WriteLine($"✓ Split completed: {pages.Count} pages\n");
 
+// Test MergePdfsAsync
+Console.WriteLine("Testing MergePdfsAsync...");
+Console.WriteLine("─────────────────────────────────────────");
+var pdfsToMerge = new List<string>
+{
+    Path.Combine(settings.OutputFolder, "page_0001.pdf"),
+    Path.Combine(settings.OutputFolder, "page_0002.pdf")
+    // Add more pages as needed
+};
+string mergedPdf = Path.Combine(settings.OutputFolder, "merged.pdf");
+await pdfService.MergePdfsAsync(pdfsToMerge, mergedPdf);
+Console.WriteLine($"✓ PDFs merged to: {mergedPdf}\n");
+
 // Test ConvertPageToImageAsync
 Console.WriteLine("Testing ConvertPageToImageAsync...");
 Console.WriteLine("─────────────────────────────────────────");
