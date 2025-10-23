@@ -47,6 +47,14 @@ await pdfService.ConvertPageToImageAsync(
 );
 Console.WriteLine($"✓ Page1 converted to image in {settings.OutputFolder}\n");
 
+// Test DeskewImageAsync
+Console.WriteLine("Testing DeskewImageAsync...");
+Console.WriteLine("─────────────────────────────────────────");
+string inputImage = Path.Combine(settings.InputFolder, "test_skewed.png");
+string deskewedImage = Path.Combine(settings.OutputFolder, "test_deskewed.png");
+await imageProcessor.DeskewImageAsync(inputImage, deskewedImage);
+Console.WriteLine($"✓ Deskewed image saved to: {deskewedImage}\n");
+
 // Test Image Processor
 Console.WriteLine("Testing Image Processor (Stub)...");
 Console.WriteLine("─────────────────────────────────────────");

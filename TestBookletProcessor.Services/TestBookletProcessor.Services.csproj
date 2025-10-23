@@ -12,6 +12,8 @@
     <PackageReference Include="itext7" Version="9.3.0" />
     <PackageReference Include="itext7.commons" Version="9.3.0" />
     <PackageReference Include="itext7.licensekey" Version="3.1.6" />
+    <PackageReference Include="OpenCvSharp4" Version="4.11.0.20250507" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.11.0.20250507" />
     <PackageReference Include="PDFsharp" Version="6.2.2" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
     <PackageReference Include="System.Drawing.Common" Version="9.0.10" />
