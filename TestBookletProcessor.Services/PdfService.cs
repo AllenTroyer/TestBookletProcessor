@@ -1,10 +1,16 @@
-﻿using PdfSharp.Pdf;
+﻿using Docnet.Core;
+using Docnet.Core.Models;
+using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using TestBookletProcessor.Core.Interfaces;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Formats.Png;
 
 namespace TestBookletProcessor.Services;
 
@@ -47,9 +53,50 @@ public class PdfService : IPdfService
 
     public async Task ConvertPageToImageAsync(string pdfPath, int pageNumber, string outputFolder)
     {
-        await Task.CompletedTask;
-        var outputPath = Path.Combine(outputFolder, $"page{pageNumber}.png");
-        Console.WriteLine($"[STUB] Converting page {pageNumber} to image: {outputPath}");
+        await Task.Run(() =>
+        {
+            if (!File.Exists(pdfPath))
+                throw new FileNotFoundException($"Input PDF not found: {pdfPath}");
+
+            Directory.CreateDirectory(outputFolder);
+            var outputPath = Path.Combine(outputFolder, $"page{pageNumber}.png");
+
+            using (var docReader = DocLib.Instance.GetDocReader(pdfPath, new PageDimensions(1080, 1920)))
+            {
+                // Docnet uses zero-based page numbers
+                using (var pageReader = docReader.GetPageReader(pageNumber - 1))
+                {
+                    int pageWidth = pageReader.GetPageWidth();
+                    int pageHeight = pageReader.GetPageHeight();
+                    var rawBytes = pageReader.GetImage();
+
+                    // Convert rawBytes (BGRA) to ImageSharp image
+                    using (var image = new Image<Rgba32>(pageWidth, pageHeight))
+                    {
+                        image.ProcessPixelRows(accessor =>
+                        {
+                            for (int y = 0; y < pageHeight; y++)
+                            {
+                                var rowSpan = accessor.GetRowSpan(y);
+                                int offset = y * pageWidth * 4;
+                                for (int x = 0; x < pageWidth; x++)
+                                {
+                                    int idx = offset + x * 4;
+                                    // BGRA to RGBA
+                                    byte b = rawBytes[idx + 0];
+                                    byte g = rawBytes[idx + 1];
+                                    byte r = rawBytes[idx + 2];
+                                    byte a = rawBytes[idx + 3];
+                                    rowSpan[x] = new Rgba32(r, g, b, a);
+                                }
+                            }
+                        });
+                        image.Save(outputPath, new PngEncoder());
+                    }
+                }
+            }
+            Console.WriteLine($"Converted page {pageNumber} to image: {outputPath}");
+        });
     }
 
     public async Task ConvertImageToPdfAsync(string imagePath, string outputPath)

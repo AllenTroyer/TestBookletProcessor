@@ -1,6 +1,7 @@
 ﻿using TestBookletProcessor.Core.Interfaces;
 using TestBookletProcessor.Core.Models;
 using TestBookletProcessor.Services;
+using System.IO;
 
 Console.WriteLine("╔════════════════════════════════════════╗");
 Console.WriteLine("║  Test Booklet Processor - Console     ║");
@@ -35,6 +36,16 @@ var pages = await pdfService.SplitPdfAsync(
     settings.OutputFolder
 );
 Console.WriteLine($"✓ Split completed: {pages.Count} pages\n");
+
+// Test ConvertPageToImageAsync
+Console.WriteLine("Testing ConvertPageToImageAsync...");
+Console.WriteLine("─────────────────────────────────────────");
+await pdfService.ConvertPageToImageAsync(
+    Path.Combine(settings.InputFolder, "sample.pdf"),
+    1,
+    settings.OutputFolder
+);
+Console.WriteLine($"✓ Page1 converted to image in {settings.OutputFolder}\n");
 
 // Test Image Processor
 Console.WriteLine("Testing Image Processor (Stub)...");
