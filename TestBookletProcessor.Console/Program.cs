@@ -55,6 +55,15 @@ string deskewedImage = Path.Combine(settings.OutputFolder, "test_deskewed.png");
 await imageProcessor.DeskewImageAsync(inputImage, deskewedImage);
 Console.WriteLine($"✓ Deskewed image saved to: {deskewedImage}\n");
 
+// Test AlignImageAsync
+Console.WriteLine("Testing AlignImageAsync...");
+Console.WriteLine("─────────────────────────────────────────");
+string alignInputImage = Path.Combine(settings.InputFolder, "test_align_input.png");
+string alignTemplateImage = Path.Combine(settings.InputFolder, "test_align_template.png");
+string alignedImage = Path.Combine(settings.OutputFolder, "test_aligned.png");
+await imageProcessor.AlignImageAsync(alignInputImage, alignTemplateImage, alignedImage);
+Console.WriteLine($"✓ Aligned image saved to: {alignedImage}\n");
+
 // Test Image Processor
 Console.WriteLine("Testing Image Processor (Stub)...");
 Console.WriteLine("─────────────────────────────────────────");
