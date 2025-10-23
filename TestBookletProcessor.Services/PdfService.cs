@@ -79,11 +79,25 @@ public class PdfService : IPdfService
             if (!File.Exists(pdfPath))
                 throw new FileNotFoundException($"Input PDF not found: {pdfPath}");
 
-            Directory.CreateDirectory(Path.GetDirectoryName(outputImagePath)!);
+            // Ensure outputImagePath is a directory, then append a filename
+            string directory = outputImagePath;
+            if (Directory.Exists(outputImagePath))
+            {
+                outputImagePath = Path.Combine(directory, $"page_{pageNumber:D4}.png");
+            }
+            else if (Path.GetExtension(outputImagePath) == string.Empty)
+            {
+                // If no extension, treat as directory and append filename
+                Directory.CreateDirectory(outputImagePath);
+                outputImagePath = Path.Combine(outputImagePath, $"page_{pageNumber:D4}.png");
+            }
+            else
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(outputImagePath)!);
+            }
 
             using (var docReader = DocLib.Instance.GetDocReader(pdfPath, new PageDimensions(1080, 1920)))
             {
-                // Docnet uses zero-based page numbers
                 using (var pageReader = docReader.GetPageReader(pageNumber - 1))
                 {
                     int pageWidth = pageReader.GetPageWidth();
