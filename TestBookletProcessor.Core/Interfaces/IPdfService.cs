@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace TestBookletProcessor.Core.Interfaces
@@ -10,7 +8,7 @@ namespace TestBookletProcessor.Core.Interfaces
     {
         Task<List<string>> SplitPdfAsync(string inputPath, string outputFolder);
         Task MergePdfsAsync(List<string> pdfPaths, string outputPath);
-        Task ConvertPageToImageAsync(string pdfPath, int pageNumber, string outputFolder);
+        Task ConvertPageToImageAsync(string pdfPath, int pageNumber, string outputImagePath);
         Task ConvertImageToPdfAsync(string imagePath, string outputPath);
     }
 }

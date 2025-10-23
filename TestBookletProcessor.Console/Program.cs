@@ -1,7 +1,7 @@
-﻿using TestBookletProcessor.Core.Interfaces;
+﻿using System.IO;
+using TestBookletProcessor.Core.Interfaces;
 using TestBookletProcessor.Core.Models;
 using TestBookletProcessor.Services;
-using System.IO;
 
 Console.WriteLine("╔════════════════════════════════════════╗");
 Console.WriteLine("║  Test Booklet Processor - Console     ║");
@@ -17,16 +17,27 @@ var settings = new ProcessingSettings
 {
     InputFolder = @"C:\TestBooklets\Input",
     OutputFolder = @"C:\TestBooklets\Output",
-    TemplatePath = @"C:\TestBooklets\Templates\template.pdf",
+    TemplateFolder = @"C:\TestBooklets\Templates",
     DPI = 300
 };
 
 Console.WriteLine("Current Settings:");
 Console.WriteLine($"  Input Folder:  {settings.InputFolder}");
 Console.WriteLine($"  Output Folder: {settings.OutputFolder}");
-Console.WriteLine($"  Template:      {settings.TemplatePath}");
+Console.WriteLine($"  Template Folder: {settings.TemplateFolder}");
 Console.WriteLine($"  DPI:           {settings.DPI}");
 Console.WriteLine();
+
+// Test BookletProcessorService integration
+Console.WriteLine("Testing BookletProcessorService integration...");
+Console.WriteLine("─────────────────────────────────────────");
+var bookletProcessor = new BookletProcessorService(pdfService, imageProcessor);
+string templatePdf = Path.Combine(settings.TemplateFolder, "template.pdf");
+string inputPdf = Path.Combine(settings.InputFolder, "input.pdf");
+string workingFolder = Path.Combine(settings.OutputFolder, "booklet_work");
+string finalOutputPdf = Path.Combine(settings.OutputFolder, "final_output.pdf");
+await bookletProcessor.ProcessBookletAsync(templatePdf, inputPdf, workingFolder, finalOutputPdf);
+Console.WriteLine($"✓ Booklet processing completed: {finalOutputPdf}\n");
 
 // Test PDF Service
 Console.WriteLine("Testing PDF Service (Stub)...");

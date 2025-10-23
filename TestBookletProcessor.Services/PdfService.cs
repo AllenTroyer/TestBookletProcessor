@@ -72,15 +72,14 @@ public class PdfService : IPdfService
         });
     }
 
-    public async Task ConvertPageToImageAsync(string pdfPath, int pageNumber, string outputFolder)
+    public async Task ConvertPageToImageAsync(string pdfPath, int pageNumber, string outputImagePath)
     {
         await Task.Run(() =>
         {
             if (!File.Exists(pdfPath))
                 throw new FileNotFoundException($"Input PDF not found: {pdfPath}");
 
-            Directory.CreateDirectory(outputFolder);
-            var outputPath = Path.Combine(outputFolder, $"page{pageNumber}.png");
+            Directory.CreateDirectory(Path.GetDirectoryName(outputImagePath)!);
 
             using (var docReader = DocLib.Instance.GetDocReader(pdfPath, new PageDimensions(1080, 1920)))
             {
@@ -91,8 +90,7 @@ public class PdfService : IPdfService
                     int pageHeight = pageReader.GetPageHeight();
                     var rawBytes = pageReader.GetImage();
 
-                    // Convert rawBytes (BGRA) to ImageSharp image
-                    using (var image = new Image<Rgba32>(pageWidth, pageHeight))
+                    using (var image = new SixLabors.ImageSharp.Image<Rgba32>(pageWidth, pageHeight))
                     {
                         image.ProcessPixelRows(accessor =>
                         {
@@ -103,7 +101,6 @@ public class PdfService : IPdfService
                                 for (int x = 0; x < pageWidth; x++)
                                 {
                                     int idx = offset + x * 4;
-                                    // BGRA to RGBA
                                     byte b = rawBytes[idx + 0];
                                     byte g = rawBytes[idx + 1];
                                     byte r = rawBytes[idx + 2];
@@ -112,11 +109,11 @@ public class PdfService : IPdfService
                                 }
                             }
                         });
-                        image.Save(outputPath, new PngEncoder());
+                        image.Save(outputImagePath, new PngEncoder());
                     }
                 }
             }
-            Console.WriteLine($"Converted page {pageNumber} to image: {outputPath}");
+            Console.WriteLine($"Converted page {pageNumber} to image: {outputImagePath}");
         });
     }
 

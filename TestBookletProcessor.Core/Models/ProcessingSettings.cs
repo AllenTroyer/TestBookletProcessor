@@ -10,7 +10,7 @@ namespace TestBookletProcessor.Core.Models
     {
         public string InputFolder { get; set; } = string.Empty;
         public string OutputFolder { get; set; } = string.Empty;
-        public string TemplatePath { get; set; } = string.Empty;
+        public string TemplateFolder { get; set; } = string.Empty;
         public int DPI { get; set; } = 300;
         public bool MonitorFolder { get; set; } = false;
     }
