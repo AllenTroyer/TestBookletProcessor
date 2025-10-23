@@ -144,14 +144,22 @@ public class PdfService : IPdfService
             using var document = new PdfDocument();
             var page = document.AddPage();
 
+            // Set page size to8.5 x11 inches (US Letter)
+            page.Width = XUnit.FromPoint(612); //8.5 inches *72
+            page.Height = XUnit.FromPoint(792); //11 inches *72
+
             using var image = XImage.FromFile(imagePath);
-            page.Width = XUnit.FromPoint(image.PixelWidth * 72.0 / image.HorizontalResolution);
-            page.Height = XUnit.FromPoint(image.PixelHeight * 72.0 / image.VerticalResolution);
+
+            // Calculate scaling to fit image within page, preserving aspect ratio
+            double scale = Math.Min(page.Width.Point / image.PixelWidth, page.Height.Point / image.PixelHeight);
+            double imgWidth = image.PixelWidth * scale;
+            double imgHeight = image.PixelHeight * scale;
+            double x = (page.Width.Point - imgWidth) /2;
+            double y = (page.Height.Point - imgHeight) /2;
 
             using (var gfx = XGraphics.FromPdfPage(page))
             {
-                // Use .Point property to avoid obsolete implicit conversion
-                gfx.DrawImage(image, 0, 0, page.Width.Point, page.Height.Point);
+                gfx.DrawImage(image, x, y, imgWidth, imgHeight);
             }
 
             document.Save(outputPath);
