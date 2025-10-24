@@ -30,7 +30,12 @@ namespace TestBookletProcessor.WPF
 
         private void BrowseInputPdf_Click(object sender, RoutedEventArgs e)
         {
+            var defaultInputFolder = _config["BookletProcessor:DefaultInputFolder"];
             var dlg = new OpenFileDialog { Filter = "PDF files (*.pdf)|*.pdf" };
+            if (!string.IsNullOrWhiteSpace(defaultInputFolder) && Directory.Exists(defaultInputFolder))
+            {
+                dlg.InitialDirectory = defaultInputFolder;
+            }
             if (dlg.ShowDialog() == true)
             {
                 InputPdfTextBox.Text = dlg.FileName;
@@ -39,7 +44,12 @@ namespace TestBookletProcessor.WPF
 
         private void BrowseTemplatePdf_Click(object sender, RoutedEventArgs e)
         {
+            var defaultTemplateFolder = _config["BookletProcessor:DefaultTemplateFolder"];
             var dlg = new OpenFileDialog { Filter = "PDF files (*.pdf)|*.pdf" };
+            if (!string.IsNullOrWhiteSpace(defaultTemplateFolder) && Directory.Exists(defaultTemplateFolder))
+            {
+                dlg.InitialDirectory = defaultTemplateFolder;
+            }
             if (dlg.ShowDialog() == true)
             {
                 TemplatePdfTextBox.Text = dlg.FileName;
@@ -98,6 +108,20 @@ namespace TestBookletProcessor.WPF
             else
             {
                 StatusTextBlock.Text = $"Error: {result.ErrorMessage}";
+            }
+        }
+
+        private void OpenSettings_Click(object sender, RoutedEventArgs e)
+        {
+            var settingsWindow = new SettingsWindow();
+            var result = settingsWindow.ShowDialog();
+            if (result == true)
+            {
+                // Reload configuration and update UI
+                _config = ConfigurationHelper.LoadConfiguration();
+                InputPdfTextBox.Text = _config["BookletProcessor:DefaultInputFolder"];
+                TemplatePdfTextBox.Text = _config["BookletProcessor:DefaultTemplateFolder"];
+                // Optionally update other UI elements if needed
             }
         }
     }
