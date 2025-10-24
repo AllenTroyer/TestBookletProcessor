@@ -199,6 +199,22 @@ public class PdfService : IPdfService
         });
     }
 
+    public static void CleanupDirectory(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            try
+            {
+                Directory.Delete(path, true);
+                Console.WriteLine($"Cleaned up temporary folder: {path}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to clean up folder {path}: {ex.Message}");
+            }
+        }
+    }
+
     public async Task ProcessBookletsAsync(
         string inputPdfPath,
         string templatePdfPath,

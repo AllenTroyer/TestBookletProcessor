@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
+using TestBookletProcessor.Core.Models;
 using TestBookletProcessor.Core.Interfaces;
 
 namespace TestBookletProcessor.Services;
@@ -15,6 +17,62 @@ public class BookletProcessorService
  {
  _pdfService = pdfService;
  _imageProcessor = imageProcessor;
+ }
+
+ public async Task<ProcessingResult> ProcessBookletsWorkflowAsync(
+ string inputPdf,
+ string templatePdf,
+ string outputFolder,
+ Action<int, int>? statusCallback = null)
+ {
+ var result = new ProcessingResult();
+ var stopwatch = Stopwatch.StartNew();
+ string bookletsFolder = Path.Combine(outputFolder, "booklets");
+ var bookletWorkingFolders = new List<string>();
+ try
+ {
+ var inputFileNameNoExt = Path.GetFileNameWithoutExtension(inputPdf);
+ string finalOutputPdf = Path.Combine(outputFolder, $"{inputFileNameNoExt}_aligned.pdf");
+ Directory.CreateDirectory(outputFolder);
+ // Split input PDF into booklets
+ var bookletPaths = await _pdfService.SplitIntoBookletsAsync(inputPdf, templatePdf, bookletsFolder);
+ var processedBookletPaths = new List<string>();
+ int totalBooklets = bookletPaths.Count;
+ int bookletIndex =1;
+ foreach (var bookletPath in bookletPaths)
+ {
+ statusCallback?.Invoke(bookletIndex, totalBooklets);
+ string bookletWorkingFolder = Path.Combine(outputFolder, $"booklet_{bookletIndex}");
+ bookletWorkingFolders.Add(bookletWorkingFolder);
+ string processedBookletOutput = Path.Combine(bookletWorkingFolder, "processed_booklet.pdf");
+ await ProcessBookletAsync(templatePdf, bookletPath, bookletWorkingFolder, processedBookletOutput);
+ processedBookletPaths.Add(processedBookletOutput);
+ bookletIndex++;
+ }
+ // Merge all processed booklets into the final output
+ await _pdfService.MergePdfsAsync(processedBookletPaths, finalOutputPdf);
+ result.Success = true;
+ result.OutputPath = finalOutputPdf;
+ result.PagesProcessed = processedBookletPaths.Count;
+ stopwatch.Stop();
+ result.ProcessingTime = stopwatch.Elapsed;
+ }
+ catch (Exception ex)
+ {
+ result.Success = false;
+ result.ErrorMessage = ex.Message;
+ stopwatch.Stop();
+ result.ProcessingTime = stopwatch.Elapsed;
+ }
+ finally
+ {
+ PdfService.CleanupDirectory(bookletsFolder);
+ foreach (var folder in bookletWorkingFolders)
+ {
+ PdfService.CleanupDirectory(folder);
+ }
+ }
+ return result;
  }
 
  public async Task ProcessBookletAsync(string templatePdf, string inputPdf, string workingFolder, string outputPdf)
