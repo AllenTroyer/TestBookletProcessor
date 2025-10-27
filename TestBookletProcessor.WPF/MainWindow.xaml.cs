@@ -13,14 +13,34 @@ namespace TestBookletProcessor.WPF
     {
         private readonly IPdfService _pdfService = new PdfService();
         private readonly IImageProcessor _imageProcessor = new ImageProcessor();
-        private readonly BookletProcessorService _bookletProcessor;
+        private readonly IRedPixelRemoverService _redPixelRemover = new RedPixelRemoverService();
+        private BookletProcessorService _bookletProcessor;
         private IConfigurationRoot _config;
+        private byte _redThreshold;
+        private bool _enableRedPixelRemover;
 
         public MainWindow()
         {
             InitializeComponent();
-            _bookletProcessor = new BookletProcessorService(_pdfService, _imageProcessor);
             _config = ConfigurationHelper.LoadConfiguration();
+            var thresholdStr = _config?["BookletProcessor:RedPixelThreshold"];
+            _redThreshold = byte.TryParse(thresholdStr, out var val) ? val : (byte)200;
+            var enableRedStr = _config?["BookletProcessor:EnableRedPixelRemover"];
+            _enableRedPixelRemover = enableRedStr != null && enableRedStr.Equals("true", StringComparison.OrdinalIgnoreCase);
+
+            // Get DPI setting
+            var dpiStr = _config?["BookletProcessor:DefaultDpi"];
+            var dpi = int.TryParse(dpiStr, out var dpiVal) ? dpiVal : 300;
+
+            _bookletProcessor = new BookletProcessorService(
+                _pdfService,
+                _imageProcessor,
+                _redPixelRemover,
+                _redThreshold,
+                _enableRedPixelRemover,
+                dpi);
+
+            Console.WriteLine($"Red pixel remover enabled: {_enableRedPixelRemover}");
 
             // Set default folders from config
             InputPdfTextBox.Text = _config["BookletProcessor:DefaultInputFolder"];
@@ -36,7 +56,7 @@ namespace TestBookletProcessor.WPF
             {
                 dlg.InitialDirectory = defaultInputFolder;
             }
-            if (dlg.ShowDialog() == true)
+            if (dlg.ShowDialog(this) == true)
             {
                 InputPdfTextBox.Text = dlg.FileName;
             }
@@ -50,7 +70,7 @@ namespace TestBookletProcessor.WPF
             {
                 dlg.InitialDirectory = defaultTemplateFolder;
             }
-            if (dlg.ShowDialog() == true)
+            if (dlg.ShowDialog(this) == true)
             {
                 TemplatePdfTextBox.Text = dlg.FileName;
             }
@@ -119,6 +139,24 @@ namespace TestBookletProcessor.WPF
             {
                 // Reload configuration and update UI
                 _config = ConfigurationHelper.LoadConfiguration();
+                var thresholdStr = _config?["BookletProcessor:RedPixelThreshold"];
+                _redThreshold = byte.TryParse(thresholdStr, out var val) ? val : (byte)200;
+                var enableRedStr = _config?["BookletProcessor:EnableRedPixelRemover"];
+                _enableRedPixelRemover = enableRedStr != null && enableRedStr.Equals("true", StringComparison.OrdinalIgnoreCase);
+
+                // Get DPI setting
+                var dpiStr = _config?["BookletProcessor:DefaultDpi"];
+                var dpi = int.TryParse(dpiStr, out var dpiVal) ? dpiVal : 300;
+
+                // Recreate the booklet processor with new settings
+                _bookletProcessor = new BookletProcessorService(
+                    _pdfService,
+                    _imageProcessor,
+                    _redPixelRemover,
+                    _redThreshold,
+                    _enableRedPixelRemover,
+                    dpi);
+
                 InputPdfTextBox.Text = _config["BookletProcessor:DefaultInputFolder"];
                 TemplatePdfTextBox.Text = _config["BookletProcessor:DefaultTemplateFolder"];
                 // Optionally update other UI elements if needed

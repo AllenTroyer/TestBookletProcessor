@@ -1,0 +1,29 @@
+.WPF\MainWindow.xaml.cs
+public MainWindow()
+{
+    InitializeComponent();
+    _config = ConfigurationHelper.LoadConfiguration();
+    var thresholdStr = _config?["BookletProcessor:RedPixelThreshold"];
+    _redThreshold = byte.TryParse(thresholdStr, out var val) ? val : (byte)200;
+    var enableRedStr = _config?["BookletProcessor:EnableRedPixelRemover"];
+    _enableRedPixelRemover = enableRedStr != null && enableRedStr.Equals("true", StringComparison.OrdinalIgnoreCase);
+    
+    // Get DPI setting
+    var dpiStr = _config?["BookletProcessor:DefaultDpi"];
+    var dpi = int.TryParse(dpiStr, out var dpiVal) ? dpiVal : 300;
+    
+    _bookletProcessor = new BookletProcessorService(
+        _pdfService, 
+        _imageProcessor, 
+        _redPixelRemover, 
+        _redThreshold, 
+        _enableRedPixelRemover,
+        dpi);
+
+    Console.WriteLine($"Red pixel remover enabled: {_enableRedPixelRemover}");
+
+    // Set default folders from config
+    InputPdfTextBox.Text = _config["BookletProcessor:DefaultInputFolder"];
+    TemplatePdfTextBox.Text = _config["BookletProcessor:DefaultTemplateFolder"];
+    // You can use _config["BookletProcessor:DefaultOutputFolder"] where needed
+}
