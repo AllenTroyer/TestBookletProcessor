@@ -8,9 +8,14 @@ Console.WriteLine("║  Test Booklet Processor - Console     ║");
 Console.WriteLine("╔════════════════════════════════════════╗");
 Console.WriteLine();
 
+// Configuration values
+bool enableRedPixelRemover = true; // Set from config or CLI
+byte redPixelThreshold = 225;      // Set from config or CLI
+
 // Initialize services
 IPdfService pdfService = new PdfService();
 IImageProcessor imageProcessor = new ImageProcessor();
+IRedPixelRemoverService redPixelRemover = new RedPixelRemoverService();
 
 // Configuration
 var settings = new ProcessingSettings
@@ -18,7 +23,7 @@ var settings = new ProcessingSettings
     InputFolder = @"C:\TestBooklets\Input",
     OutputFolder = @"C:\TestBooklets\Output",
     TemplateFolder = @"C:\TestBooklets\Templates",
-    DPI = 300
+    DPI = 400
 };
 
 Console.WriteLine("Current Settings:");
@@ -31,23 +36,30 @@ Console.WriteLine();
 // Test BookletProcessorService integration
 Console.WriteLine("Testing BookletProcessorService integration...");
 Console.WriteLine("─────────────────────────────────────────");
-var bookletProcessor = new BookletProcessorService(pdfService, imageProcessor);
-string templatePdf = Path.Combine(settings.TemplateFolder, "template.pdf");
-string inputPdf = Path.Combine(settings.InputFolder, "input.pdf");
+var bookletProcessor = new BookletProcessorService(
+    pdfService,
+    imageProcessor,
+    redPixelRemover,
+    redPixelThreshold,
+    enableRedPixelRemover,
+    settings.DPI
+);
+string templatePdf = Path.Combine(settings.TemplateFolder, "Level3template.pdf");
+string inputPdf = Path.Combine(settings.InputFolder, "Level3.pdf");
 string workingFolder = Path.Combine(settings.OutputFolder, "booklet_work");
 string finalOutputPdf = Path.Combine(settings.OutputFolder, "final_output.pdf");
 
 // Split input PDF into booklets
 var bookletPaths = await pdfService.SplitIntoBookletsAsync(inputPdf, templatePdf, Path.Combine(workingFolder, "booklets"));
 var processedBookletPaths = new List<string>();
-int bookletIndex =1;
+int bookletIndex = 1;
 foreach (var bookletPath in bookletPaths)
 {
- string bookletWorkingFolder = Path.Combine(workingFolder, $"booklet_{bookletIndex}");
- string processedBookletOutput = Path.Combine(bookletWorkingFolder, "processed_booklet.pdf");
- await bookletProcessor.ProcessBookletAsync(templatePdf, bookletPath, bookletWorkingFolder, processedBookletOutput);
- processedBookletPaths.Add(processedBookletOutput);
- bookletIndex++;
+    string bookletWorkingFolder = Path.Combine(workingFolder, $"booklet_{bookletIndex}");
+    string processedBookletOutput = Path.Combine(bookletWorkingFolder, "processed_booklet.pdf");
+    await bookletProcessor.ProcessBookletAsync(templatePdf, bookletPath, bookletWorkingFolder, processedBookletOutput, settings.DPI);
+    processedBookletPaths.Add(processedBookletOutput);
+    bookletIndex++;
 }
 // Merge all processed booklets into the final output
 await pdfService.MergePdfsAsync(processedBookletPaths, finalOutputPdf);
