@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Toolkit.Uwp.Notifications;
 using Microsoft.Win32;
 using System;
 using System.IO;
@@ -72,13 +73,28 @@ namespace TestBookletProcessor.WPF
 
         private async void FolderMonitorJobService_FileDetected(object? sender, FolderFileDetectedEventArgs e)
         {
-            // Use detected file and template for alignment job
-            string tempOutput = Path.Combine(_tempFolder, Guid.NewGuid() + "_aligned.pdf");
-            await _imageProcessor.AlignImageAsync(e.FilePath, e.TemplateFilePath, tempOutput);
-            // Optionally notify user/UI or queue further processing
+            new ToastContentBuilder()
+    .AddText("Alignment Started")
+    .AddText($"Aligning detected file: {e.FilePath} with template: {e.TemplateFilePath}")
+    .Show();
+            //MessageBox.Show($"Aligning detected file:\n{e.FilePath}\nwith template:\n{e.TemplateFilePath}", "Alignment Started", MessageBoxButton.OK, MessageBoxImage.Information);
+
+            // Use detected file and template for full booklet processing
+            var result = await _bookletProcessor.ProcessBookletsWorkflowAsync(
+                e.FilePath,
+                e.TemplateFilePath,
+                _tempFolder,
+                null);
             Dispatcher.Invoke(() =>
             {
-                StatusTextBlock.Text = $"Aligned file created: {tempOutput}";
+                if (result.Success)
+                {
+                    MessageBox.Show($"Processing complete! {result.PagesProcessed} booklets processed in {result.ProcessingTime.ToString(@"mm\:ss")}. Output: {result.OutputPath}", "Alignment Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show($"Error: {result.ErrorMessage}", "Alignment Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
             });
         }
 

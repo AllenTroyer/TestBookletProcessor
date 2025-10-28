@@ -56,11 +56,18 @@ namespace TestBookletProcessor.WPF
  {
  var folder = FolderPathTextBox.Text.Trim();
  var template = TemplateFileTextBox.Text.Trim();
- if (!string.IsNullOrWhiteSpace(folder) && !string.IsNullOrWhiteSpace(template))
+ if (string.IsNullOrWhiteSpace(folder) || string.IsNullOrWhiteSpace(template))
  {
+ MessageBox.Show("Both folder path and template file are required.", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+ return;
+ }
+ if (Jobs.Any(j => string.Equals(j.FolderPath, folder, StringComparison.OrdinalIgnoreCase)))
+ {
+ MessageBox.Show("A job for this folder already exists.", "Duplicate Folder", MessageBoxButton.OK, MessageBoxImage.Warning);
+ return;
+ }
  _jobService.AddJob(folder, template);
  Jobs.Add(new FolderMonitorJobConfig { FolderPath = folder, TemplateFilePath = template });
- }
  }
 
  private void RemoveJob_Click(object sender, RoutedEventArgs e)
