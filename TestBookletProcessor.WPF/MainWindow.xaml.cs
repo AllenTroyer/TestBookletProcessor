@@ -5,6 +5,7 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 using TestBookletProcessor.Core.Interfaces;
+using TestBookletProcessor.Core.Models;
 using TestBookletProcessor.Services;
 
 namespace TestBookletProcessor.WPF
@@ -18,6 +19,8 @@ namespace TestBookletProcessor.WPF
         private IConfigurationRoot _config;
         private byte _redThreshold;
         private bool _enableRedPixelRemover;
+        private IFolderMonitorJobService _folderMonitorJobService;
+        private string _tempFolder;
 
         public MainWindow()
         {
@@ -45,7 +48,38 @@ namespace TestBookletProcessor.WPF
             // Set default folders from config
             InputPdfTextBox.Text = _config["BookletProcessor:DefaultInputFolder"];
             TemplatePdfTextBox.Text = _config["BookletProcessor:DefaultTemplateFolder"];
-            // You can use _config["BookletProcessor:DefaultOutputFolder"] where needed
+
+            _tempFolder = _config["BookletProcessor:TempFolder"] ?? Path.GetTempPath();
+            var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");
+            _folderMonitorJobService = new FolderMonitorJobService(configPath);
+            _folderMonitorJobService.FileDetected += FolderMonitorJobService_FileDetected;
+            LoadFolderMonitorJobsFromConfig();
+        }
+
+        private void LoadFolderMonitorJobsFromConfig()
+        {
+            var jobsSection = _config.GetSection("MonitoredFolders");
+            foreach (var job in jobsSection.GetChildren())
+            {
+                var folder = job["InputFolder"];
+                var template = job["TemplateFile"];
+                if (!string.IsNullOrWhiteSpace(folder) && !string.IsNullOrWhiteSpace(template))
+                {
+                    _folderMonitorJobService.AddJob(folder, template);
+                }
+            }
+        }
+
+        private async void FolderMonitorJobService_FileDetected(object? sender, FolderFileDetectedEventArgs e)
+        {
+            // Use detected file and template for alignment job
+            string tempOutput = Path.Combine(_tempFolder, Guid.NewGuid() + "_aligned.pdf");
+            await _imageProcessor.AlignImageAsync(e.FilePath, e.TemplateFilePath, tempOutput);
+            // Optionally notify user/UI or queue further processing
+            Dispatcher.Invoke(() =>
+            {
+                StatusTextBlock.Text = $"Aligned file created: {tempOutput}";
+            });
         }
 
         private void BrowseInputPdf_Click(object sender, RoutedEventArgs e)
@@ -163,6 +197,13 @@ namespace TestBookletProcessor.WPF
                 TemplatePdfTextBox.Text = _config["BookletProcessor:DefaultTemplateFolder"];
                 // Optionally update other UI elements if needed
             }
+        }
+
+        private void OpenFolderMonitorJobs_Click(object sender, RoutedEventArgs e)
+        {
+            var jobsWindow = new FolderMonitorJobsWindow(_folderMonitorJobService);
+            jobsWindow.Owner = this;
+            jobsWindow.ShowDialog();
         }
     }
 }

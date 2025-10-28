@@ -6,6 +6,7 @@
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="Settings">
                 <MenuItem Header="Preferences..." Click="OpenSettings_Click"/>
+                <MenuItem Header="Manage Folder Monitor Jobs..." Click="OpenFolderMonitorJobs_Click"/>
             </MenuItem>
         </Menu>
         <Grid Margin="20">
