@@ -134,6 +134,8 @@ namespace TestBookletProcessor.WPF
         private void OpenSettings_Click(object sender, RoutedEventArgs e)
         {
             var settingsWindow = new SettingsWindow();
+            settingsWindow.Owner = this;
+            settingsWindow.Topmost = true;
             var result = settingsWindow.ShowDialog();
             if (result == true)
             {

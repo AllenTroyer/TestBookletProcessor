@@ -15,6 +15,7 @@ namespace TestBookletProcessor.WPF
         public SettingsWindow()
         {
             InitializeComponent();
+            //Topmost = true;
             LoadSettings();
         }
 
@@ -38,7 +39,7 @@ namespace TestBookletProcessor.WPF
         private void BrowseInputFolder_Click(object sender, RoutedEventArgs e)
         {
             var dlg = new CommonOpenFileDialog { IsFolderPicker = true };
-            if (dlg.ShowDialog() == CommonFileDialogResult.Ok)
+            if (dlg.ShowDialog(this) == CommonFileDialogResult.Ok)
             {
                 InputFolderTextBox.Text = dlg.FileName;
             }
@@ -47,7 +48,7 @@ namespace TestBookletProcessor.WPF
         private void BrowseTemplateFolder_Click(object sender, RoutedEventArgs e)
         {
             var dlg = new CommonOpenFileDialog { IsFolderPicker = true };
-            if (dlg.ShowDialog() == CommonFileDialogResult.Ok)
+            if (dlg.ShowDialog(this) == CommonFileDialogResult.Ok)
             {
                 TemplateFolderTextBox.Text = dlg.FileName;
             }
@@ -56,7 +57,7 @@ namespace TestBookletProcessor.WPF
         private void BrowseOutputFolder_Click(object sender, RoutedEventArgs e)
         {
             var dlg = new CommonOpenFileDialog { IsFolderPicker = true };
-            if (dlg.ShowDialog() == CommonFileDialogResult.Ok)
+            if (dlg.ShowDialog(this) == CommonFileDialogResult.Ok)
             {
                 OutputFolderTextBox.Text = dlg.FileName;
             }
