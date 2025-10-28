@@ -5,6 +5,8 @@ using Microsoft.Win32;
 using TestBookletProcessor.Core.Interfaces;
 using TestBookletProcessor.Core.Models;
 using Microsoft.WindowsAPICodePack.Dialogs;
+using System.IO;
+using Newtonsoft.Json.Linq;
 
 namespace TestBookletProcessor.WPF
 {
@@ -12,13 +14,34 @@ namespace TestBookletProcessor.WPF
  {
  private readonly IFolderMonitorJobService _jobService;
  public ObservableCollection<FolderMonitorJobConfig> Jobs { get; } = new();
+ private JObject _configJson;
 
  public FolderMonitorJobsWindow(IFolderMonitorJobService jobService)
  {
  InitializeComponent();
  _jobService = jobService;
+ LoadConfig();
  LoadJobs();
  JobsListView.ItemsSource = Jobs;
+ }
+
+ private void LoadConfig()
+ {
+ var configPath = "appsettings.json";
+ if (File.Exists(configPath))
+ {
+ var json = File.ReadAllText(configPath);
+ _configJson = JObject.Parse(json);
+ }
+ else
+ {
+ _configJson = new JObject();
+ }
+ }
+
+ private string GetDefaultFolder(string key)
+ {
+ return _configJson?["BookletProcessor"]?[key]?.ToString() ?? string.Empty;
  }
 
  private void LoadJobs()
@@ -38,6 +61,11 @@ namespace TestBookletProcessor.WPF
  private void BrowseFolder_Click(object sender, RoutedEventArgs e)
  {
  var dlg = new CommonOpenFileDialog { IsFolderPicker = true };
+ var defaultInput = GetDefaultFolder("DefaultInputFolder");
+ if (!string.IsNullOrWhiteSpace(defaultInput) && Directory.Exists(defaultInput))
+ {
+ dlg.InitialDirectory = defaultInput;
+ }
  if (dlg.ShowDialog() == CommonFileDialogResult.Ok)
  {
  FolderPathTextBox.Text = dlg.FileName;
@@ -47,6 +75,11 @@ namespace TestBookletProcessor.WPF
  private void BrowseTemplate_Click(object sender, RoutedEventArgs e)
  {
  var dlg = new OpenFileDialog { Filter = "PDF files (*.pdf)|*.pdf|All files (*.*)|*.*" };
+ var defaultTemplate = GetDefaultFolder("DefaultTemplateFolder");
+ if (!string.IsNullOrWhiteSpace(defaultTemplate) && Directory.Exists(defaultTemplate))
+ {
+ dlg.InitialDirectory = defaultTemplate;
+ }
  if (dlg.ShowDialog(this) == true)
  {
  TemplateFileTextBox.Text = dlg.FileName;
@@ -56,6 +89,11 @@ namespace TestBookletProcessor.WPF
  private void BrowseOutputFolder_Click(object sender, RoutedEventArgs e)
  {
  var dlg = new CommonOpenFileDialog { IsFolderPicker = true };
+ var defaultOutput = GetDefaultFolder("DefaultOutputFolder");
+ if (!string.IsNullOrWhiteSpace(defaultOutput) && Directory.Exists(defaultOutput))
+ {
+ dlg.InitialDirectory = defaultOutput;
+ }
  if (dlg.ShowDialog() == CommonFileDialogResult.Ok)
  {
  OutputFolderTextBox.Text = dlg.FileName;

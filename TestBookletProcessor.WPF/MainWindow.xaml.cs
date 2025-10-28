@@ -26,6 +26,7 @@ namespace TestBookletProcessor.WPF
         public MainWindow()
         {
             InitializeComponent();
+            // Removed duplicate AUMID call - already set in App.xaml.cs
             _config = ConfigurationHelper.LoadConfiguration();
             var thresholdStr = _config?["BookletProcessor:RedPixelThreshold"];
             _redThreshold = byte.TryParse(thresholdStr, out var val) ? val : (byte)200;
@@ -75,10 +76,14 @@ namespace TestBookletProcessor.WPF
         private async void FolderMonitorJobService_FileDetected(object? sender, FolderFileDetectedEventArgs e)
         {
             new ToastContentBuilder()
-    .AddText("Alignment Started")
-    .AddText($"Aligning detected file: {e.FilePath} with template: {e.TemplateFilePath}")
-    .Show();
+            .AddText("Alignment Started")
+            .AddText($"Aligning detected file: {e.FilePath} with template: {e.TemplateFilePath}")
+            .Show(toast =>
+            {
+                toast.ExpirationTime = DateTime.Now.AddSeconds(5);
+            });
             //MessageBox.Show($"Aligning detected file:\n{e.FilePath}\nwith template:\n{e.TemplateFilePath}", "Alignment Started", MessageBoxButton.OK, MessageBoxImage.Information);
+            // add a toast message here instead of message box
 
             // Use detected file and template for full booklet processing
             var result = await _bookletProcessor.ProcessBookletsWorkflowAsync(
@@ -86,18 +91,29 @@ namespace TestBookletProcessor.WPF
                 e.TemplateFilePath,
                 e.OutputFolder,
                 null);
-            Dispatcher.Invoke(() =>
+            //Dispatcher.Invoke(() =>
+            //{
+            if (result.Success)
             {
-                if (result.Success)
+                var message = $"Processing complete! {result.PagesProcessed} booklets processed in {result.ProcessingTime:mm\\:ss}. Output: {result.OutputPath}";
+
+                new ToastContentBuilder()
+                    .AddText("Alignment Complete")
+                    .AddText(message)
+                    .Show(toast =>
+                    {
+                        toast.ExpirationTime = DateTime.Now.AddSeconds(5);
+                    });
+            }
+            else
+            {
+                Dispatcher.Invoke(() =>
                 {
-                    MessageBox.Show($"Processing complete! {result.PagesProcessed} booklets processed in {result.ProcessingTime.ToString(@"mm\:ss")}. Output: {result.OutputPath}", "Alignment Complete", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                else
-                {
-                    MessageBox.Show($"Error: {result.ErrorMessage}", "Alignment Complete", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-            });
+                    MessageBox.Show($"Error: {result.ErrorMessage}", "Error", MessageBoxButton.OK, MessageBoxImage.Information);
+                });
+            }
         }
+
 
         private void BrowseInputPdf_Click(object sender, RoutedEventArgs e)
         {
