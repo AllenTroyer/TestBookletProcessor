@@ -41,23 +41,24 @@ namespace TestBookletProcessor.Services
  {
  var folder = job["InputFolder"]?.ToString();
  var template = job["TemplateFile"]?.ToString();
- if (!string.IsNullOrWhiteSpace(folder) && !string.IsNullOrWhiteSpace(template))
+ var output = job["OutputFolder"]?.ToString();
+ if (!string.IsNullOrWhiteSpace(folder) && !string.IsNullOrWhiteSpace(template) && !string.IsNullOrWhiteSpace(output))
  {
- AddJob(folder, template, false); // Don't persist again
+ AddJob(folder, template, output, false); // Don't persist again
  }
  }
  }
  }
 
- public void AddJob(string folderPath, string templateFilePath)
+ public void AddJob(string folderPath, string templateFilePath, string outputFolder)
  {
- AddJob(folderPath, templateFilePath, true);
+ AddJob(folderPath, templateFilePath, outputFolder, true);
  }
 
- private void AddJob(string folderPath, string templateFilePath, bool persist)
+ private void AddJob(string folderPath, string templateFilePath, string outputFolder, bool persist)
  {
  if (_watchers.ContainsKey(folderPath)) return;
- var jobConfig = new FolderMonitorJobConfig { FolderPath = folderPath, TemplateFilePath = templateFilePath };
+ var jobConfig = new FolderMonitorJobConfig { FolderPath = folderPath, TemplateFilePath = templateFilePath, OutputFolder = outputFolder };
  var watcher = new FileSystemWatcher(folderPath)
  {
  EnableRaisingEvents = true,
@@ -70,7 +71,8 @@ namespace TestBookletProcessor.Services
  {
  FolderPath = folderPath,
  FilePath = e.FullPath,
- TemplateFilePath = templateFilePath
+ TemplateFilePath = templateFilePath,
+ OutputFolder = outputFolder
  });
  };
  _watchers[folderPath] = watcher;
@@ -100,7 +102,8 @@ namespace TestBookletProcessor.Services
  jobsArray.Add(new JObject
  {
  ["InputFolder"] = job.FolderPath,
- ["TemplateFile"] = job.TemplateFilePath
+ ["TemplateFile"] = job.TemplateFilePath,
+ ["OutputFolder"] = job.OutputFolder
  });
  }
  _configJson["MonitoredFolders"] = jobsArray;

@@ -64,9 +64,10 @@ namespace TestBookletProcessor.WPF
             {
                 var folder = job["InputFolder"];
                 var template = job["TemplateFile"];
-                if (!string.IsNullOrWhiteSpace(folder) && !string.IsNullOrWhiteSpace(template))
+                var output = job["OutputFolder"];
+                if (!string.IsNullOrWhiteSpace(folder) && !string.IsNullOrWhiteSpace(template) && !string.IsNullOrWhiteSpace(output))
                 {
-                    _folderMonitorJobService.AddJob(folder, template);
+                    _folderMonitorJobService.AddJob(folder, template, output);
                 }
             }
         }
@@ -83,7 +84,7 @@ namespace TestBookletProcessor.WPF
             var result = await _bookletProcessor.ProcessBookletsWorkflowAsync(
                 e.FilePath,
                 e.TemplateFilePath,
-                _tempFolder,
+                e.OutputFolder,
                 null);
             Dispatcher.Invoke(() =>
             {

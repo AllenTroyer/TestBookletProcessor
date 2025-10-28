@@ -29,7 +29,8 @@ namespace TestBookletProcessor.WPF
  Jobs.Add(new FolderMonitorJobConfig
  {
  FolderPath = job.FolderPath,
- TemplateFilePath = job.TemplateFilePath
+ TemplateFilePath = job.TemplateFilePath,
+ OutputFolder = job.OutputFolder
  });
  }
  }
@@ -52,13 +53,23 @@ namespace TestBookletProcessor.WPF
  }
  }
 
+ private void BrowseOutputFolder_Click(object sender, RoutedEventArgs e)
+ {
+ var dlg = new CommonOpenFileDialog { IsFolderPicker = true };
+ if (dlg.ShowDialog() == CommonFileDialogResult.Ok)
+ {
+ OutputFolderTextBox.Text = dlg.FileName;
+ }
+ }
+
  private void AddJob_Click(object sender, RoutedEventArgs e)
  {
  var folder = FolderPathTextBox.Text.Trim();
  var template = TemplateFileTextBox.Text.Trim();
- if (string.IsNullOrWhiteSpace(folder) || string.IsNullOrWhiteSpace(template))
+ var output = OutputFolderTextBox.Text.Trim();
+ if (string.IsNullOrWhiteSpace(folder) || string.IsNullOrWhiteSpace(template) || string.IsNullOrWhiteSpace(output))
  {
- MessageBox.Show("Both folder path and template file are required.", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+ MessageBox.Show("Folder path, template file, and output folder are required.", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
  return;
  }
  if (Jobs.Any(j => string.Equals(j.FolderPath, folder, StringComparison.OrdinalIgnoreCase)))
@@ -66,8 +77,8 @@ namespace TestBookletProcessor.WPF
  MessageBox.Show("A job for this folder already exists.", "Duplicate Folder", MessageBoxButton.OK, MessageBoxImage.Warning);
  return;
  }
- _jobService.AddJob(folder, template);
- Jobs.Add(new FolderMonitorJobConfig { FolderPath = folder, TemplateFilePath = template });
+ _jobService.AddJob(folder, template, output);
+ Jobs.Add(new FolderMonitorJobConfig { FolderPath = folder, TemplateFilePath = template, OutputFolder = output });
  }
 
  private void RemoveJob_Click(object sender, RoutedEventArgs e)

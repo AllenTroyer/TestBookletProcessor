@@ -1,7 +1,7 @@
 <Window x:Class="TestBookletProcessor.WPF.FolderMonitorJobsWindow"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
- Title="Folder Monitor Jobs" Height="400" Width="800">
+ Title="Folder Monitor Jobs" Height="400" Width="1000">
  <DockPanel>
  <StackPanel Orientation="Horizontal" DockPanel.Dock="Top" Margin="10" VerticalAlignment="Top">
  <StackPanel Orientation="Vertical" Margin="0,0,10,0">
@@ -14,13 +14,19 @@
  <TextBox x:Name="TemplateFileTextBox" Width="200"/>
  </StackPanel>
  <Button Content="Browse..." Click="BrowseTemplate_Click" Width="80" Margin="0,22,10,0"/>
+ <StackPanel Orientation="Vertical" Margin="0,0,10,0">
+ <TextBlock Text="Output Folder:" Margin="0,0,0,5"/>
+ <TextBox x:Name="OutputFolderTextBox" Width="200"/>
+ </StackPanel>
+ <Button Content="Browse..." Click="BrowseOutputFolder_Click" Width="80" Margin="0,22,10,0"/>
  <Button Content="Add Job" Click="AddJob_Click" Width="80" Margin="0,22,0,0"/>
  </StackPanel>
  <ListView x:Name="JobsListView" Margin="10" DockPanel.Dock="Top">
  <ListView.View>
  <GridView>
- <GridViewColumn Header="Folder Path" DisplayMemberBinding="{Binding FolderPath}" Width="250"/>
- <GridViewColumn Header="Template File" DisplayMemberBinding="{Binding TemplateFilePath}" Width="250"/>
+ <GridViewColumn Header="Folder Path" DisplayMemberBinding="{Binding FolderPath}" Width="220"/>
+ <GridViewColumn Header="Template File" DisplayMemberBinding="{Binding TemplateFilePath}" Width="220"/>
+ <GridViewColumn Header="Output Folder" DisplayMemberBinding="{Binding OutputFolder}" Width="220"/>
  <GridViewColumn Header="Actions" Width="80">
  <GridViewColumn.CellTemplate>
  <DataTemplate>
