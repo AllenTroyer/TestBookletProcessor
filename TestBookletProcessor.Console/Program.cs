@@ -1,134 +1,52 @@
-﻿using System.IO;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
 using TestBookletProcessor.Core.Interfaces;
 using TestBookletProcessor.Core.Models;
 using TestBookletProcessor.Services;
 
-Console.WriteLine("╔════════════════════════════════════════╗");
-Console.WriteLine("║  Test Booklet Processor - Console     ║");
-Console.WriteLine("╔════════════════════════════════════════╗");
-Console.WriteLine();
-
-// Configuration values
-bool enableRedPixelRemover = true; // Set from config or CLI
-byte redPixelThreshold = 225;      // Set from config or CLI
-
-// Initialize services
-IPdfService pdfService = new PdfService();
-IImageProcessor imageProcessor = new ImageProcessor();
-IRedPixelRemoverService redPixelRemover = new RedPixelRemoverService();
-
-// Configuration
-var settings = new ProcessingSettings
+class Program
 {
-    InputFolder = @"C:\TestBooklets\Input",
-    OutputFolder = @"C:\TestBooklets\Output",
-    TemplateFolder = @"C:\TestBooklets\Templates",
-    DPI = 400
-};
+ static async Task Main(string[] args)
+ {
+ // Paths for testing
+ string templatePdf = @"C:\TestBooklets\Input\template.pdf";
+ string inputPdf = @"C:\TestBooklets\Input\input.pdf";
+ string workingFolder = @"C:\TestBooklets\Working";
+ string outputPdf = @"C:\TestBooklets\Output\final_output.pdf";
 
-Console.WriteLine("Current Settings:");
-Console.WriteLine($"  Input Folder:  {settings.InputFolder}");
-Console.WriteLine($"  Output Folder: {settings.OutputFolder}");
-Console.WriteLine($"  Template Folder: {settings.TemplateFolder}");
-Console.WriteLine($"  DPI:           {settings.DPI}");
-Console.WriteLine();
+ // Ensure working/output folders exist
+ Directory.CreateDirectory(workingFolder);
+ Directory.CreateDirectory(Path.GetDirectoryName(outputPdf)!);
 
-// Test BookletProcessorService integration
-Console.WriteLine("Testing BookletProcessorService integration...");
-Console.WriteLine("─────────────────────────────────────────");
-var bookletProcessor = new BookletProcessorService(
-    pdfService,
-    imageProcessor,
-    redPixelRemover,
-    redPixelThreshold,
-    enableRedPixelRemover,
-    settings.DPI
-);
-string templatePdf = Path.Combine(settings.TemplateFolder, "Level3template.pdf");
-string inputPdf = Path.Combine(settings.InputFolder, "Level3.pdf");
-string workingFolder = Path.Combine(settings.OutputFolder, "booklet_work");
-string finalOutputPdf = Path.Combine(settings.OutputFolder, "final_output.pdf");
+ // Create service instances
+ IPdfService pdfService = new PdfService();
+ IDeskewer deskewer = new Deskewer();
+ IImageAligner aligner = new ImageAligner();
+ IRedPixelRemoverService redPixelRemover = new RedPixelRemoverService();
+ byte redPixelThreshold =225;
+ bool enableRedPixelRemover = true;
+ int dpi =300;
 
-// Split input PDF into booklets
-var bookletPaths = await pdfService.SplitIntoBookletsAsync(inputPdf, templatePdf, Path.Combine(workingFolder, "booklets"));
-var processedBookletPaths = new List<string>();
-int bookletIndex = 1;
-foreach (var bookletPath in bookletPaths)
-{
-    string bookletWorkingFolder = Path.Combine(workingFolder, $"booklet_{bookletIndex}");
-    string processedBookletOutput = Path.Combine(bookletWorkingFolder, "processed_booklet.pdf");
-    await bookletProcessor.ProcessBookletAsync(templatePdf, bookletPath, bookletWorkingFolder, processedBookletOutput, settings.DPI);
-    processedBookletPaths.Add(processedBookletOutput);
-    bookletIndex++;
+ var bookletProcessor = new BookletProcessorService(
+ pdfService,
+ deskewer,
+ aligner,
+ redPixelRemover,
+ redPixelThreshold,
+ enableRedPixelRemover,
+ dpi
+ );
+
+ try
+ {
+ await bookletProcessor.ProcessBookletAsync(templatePdf, inputPdf, workingFolder, outputPdf, dpi);
+ Console.WriteLine("Test completed successfully.");
+ }
+ catch (Exception ex)
+ {
+ Console.WriteLine($"Test failed: {ex.Message}");
+ }
+ }
 }
-// Merge all processed booklets into the final output
-await pdfService.MergePdfsAsync(processedBookletPaths, finalOutputPdf);
-Console.WriteLine($"✓ Booklet processing completed: {finalOutputPdf}\n");
-
-//// Test PDF Service
-//Console.WriteLine("Testing PDF Service (Stub)...");
-//Console.WriteLine("─────────────────────────────────────────");
-//var pages = await pdfService.SplitPdfAsync(
-//    Path.Combine(settings.InputFolder, "sample.pdf"),
-//    settings.OutputFolder
-//);
-//Console.WriteLine($"✓ Split completed: {pages.Count} pages\n");
-
-//// Test MergePdfsAsync
-//Console.WriteLine("Testing MergePdfsAsync...");
-//Console.WriteLine("─────────────────────────────────────────");
-//var pdfsToMerge = new List<string>
-//{
-//    Path.Combine(settings.OutputFolder, "page_0001.pdf"),
-//    Path.Combine(settings.OutputFolder, "page_0002.pdf")
-//    // Add more pages as needed
-//};
-//string mergedPdf = Path.Combine(settings.OutputFolder, "merged.pdf");
-//await pdfService.MergePdfsAsync(pdfsToMerge, mergedPdf);
-//Console.WriteLine($"✓ PDFs merged to: {mergedPdf}\n");
-
-//// Test ConvertPageToImageAsync
-//Console.WriteLine("Testing ConvertPageToImageAsync...");
-//Console.WriteLine("─────────────────────────────────────────");
-//await pdfService.ConvertPageToImageAsync(
-//    Path.Combine(settings.InputFolder, "sample.pdf"),
-//    1,
-//    settings.OutputFolder
-//);
-//Console.WriteLine($"✓ Page1 converted to image in {settings.OutputFolder}\n");
-
-//// Test DeskewImageAsync
-//Console.WriteLine("Testing DeskewImageAsync...");
-//Console.WriteLine("─────────────────────────────────────────");
-//string inputImage = Path.Combine(settings.InputFolder, "test_skewed.png");
-//string deskewedImage = Path.Combine(settings.OutputFolder, "test_deskewed.png");
-//await imageProcessor.DeskewImageAsync(inputImage, deskewedImage);
-//Console.WriteLine($"✓ Deskewed image saved to: {deskewedImage}\n");
-
-//// Test AlignImageAsync
-//Console.WriteLine("Testing AlignImageAsync...");
-//Console.WriteLine("─────────────────────────────────────────");
-//string alignInputImage = Path.Combine(settings.InputFolder, "test_align_input.png");
-//string alignTemplateImage = Path.Combine(settings.InputFolder, "test_align_template.png");
-//string alignedImage = Path.Combine(settings.OutputFolder, "test_aligned.png");
-//await imageProcessor.AlignImageAsync(alignInputImage, alignTemplateImage, alignedImage);
-//Console.WriteLine($"✓ Aligned image saved to: {alignedImage}\n");
-
-//// Test ConvertImageToPdfAsync
-//Console.WriteLine("Testing ConvertImageToPdfAsync...");
-//Console.WriteLine("─────────────────────────────────────────");
-//string imageToConvert = Path.Combine(settings.InputFolder, "test_image.png");
-//string pdfOutput = Path.Combine(settings.OutputFolder, "test_image_converted.pdf");
-//await pdfService.ConvertImageToPdfAsync(imageToConvert, pdfOutput);
-//Console.WriteLine($"✓ Image converted to PDF: {pdfOutput}\n");
-
-//// Test Image Processor
-//Console.WriteLine("Testing Image Processor (Stub)...");
-//Console.WriteLine("─────────────────────────────────────────");
-//var angle = await imageProcessor.DetectSkewAngleAsync("test_image.png");
-//Console.WriteLine($"✓ Skew detection completed: {angle}°\n");
-
-//Console.WriteLine("═════════════════════════════════════════");
-//Console.WriteLine("All stub tests completed successfully!");
-//Console.WriteLine("Press any key to exit...");
-//Console.ReadKey();

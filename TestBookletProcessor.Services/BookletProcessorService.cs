@@ -11,7 +11,8 @@ namespace TestBookletProcessor.Services;
 public class BookletProcessorService
 {
     private readonly IPdfService _pdfService;
-    private readonly IImageProcessor _imageProcessor;
+    private readonly IDeskewer _deskewer;
+    private readonly IImageAligner _aligner;
     private readonly IRedPixelRemoverService? _redPixelRemover;
     private readonly byte _redThreshold;
     private readonly bool _enableRedPixelRemover;
@@ -19,14 +20,16 @@ public class BookletProcessorService
 
     public BookletProcessorService(
         IPdfService pdfService,
-        IImageProcessor imageProcessor,
+        IDeskewer deskewer,
+        IImageAligner aligner,
         IRedPixelRemoverService? redPixelRemover = null,
         byte redThreshold = 200,
         bool enableRedPixelRemover = false,
         int dpi = 300)
     {
         _pdfService = pdfService;
-        _imageProcessor = imageProcessor;
+        _deskewer = deskewer;
+        _aligner = aligner;
         _redPixelRemover = redPixelRemover;
         _redThreshold = redThreshold;
         _enableRedPixelRemover = enableRedPixelRemover;
@@ -113,7 +116,7 @@ public class BookletProcessorService
             //3. Deskew and align input image to template image
             string deskewedImg = Path.Combine(workingFolder, "deskewed_images", $"deskewed_{i + 1}.png");
             Directory.CreateDirectory(Path.GetDirectoryName(deskewedImg)!);
-            await _imageProcessor.DeskewImageAsync(inputImg, deskewedImg);
+            await _deskewer.DeskewImageAsync(inputImg, deskewedImg);
 
             string redRemovedImg = deskewedImg;
             if (_enableRedPixelRemover && _redPixelRemover != null)
@@ -125,7 +128,7 @@ public class BookletProcessorService
 
             string alignedImg = Path.Combine(workingFolder, "aligned_images", $"aligned_{i + 1}.png");
             Directory.CreateDirectory(Path.GetDirectoryName(alignedImg)!);
-            await _imageProcessor.AlignImageAsync(redRemovedImg, templateImg, alignedImg);
+            await _aligner.AlignImageAsync(redRemovedImg, templateImg, alignedImg);
 
             //4. Convert processed image back to PDF
             string processedPdf = Path.Combine(workingFolder, "processed_pages", $"processed_{i + 1}.pdf");

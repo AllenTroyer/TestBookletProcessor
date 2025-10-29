@@ -14,7 +14,8 @@ namespace TestBookletProcessor.WPF
     public partial class MainWindow : Window
     {
         private readonly IPdfService _pdfService = new PdfService();
-        private readonly IImageProcessor _imageProcessor = new ImageProcessor();
+        private readonly IDeskewer _deskewer = new Deskewer();
+        private readonly IImageAligner _aligner = new ImageAligner();
         private readonly IRedPixelRemoverService _redPixelRemover = new RedPixelRemoverService();
         private BookletProcessorService _bookletProcessor;
         private IConfigurationRoot _config;
@@ -39,7 +40,8 @@ namespace TestBookletProcessor.WPF
 
             _bookletProcessor = new BookletProcessorService(
                 _pdfService,
-                _imageProcessor,
+                _deskewer,
+                _aligner,
                 _redPixelRemover,
                 _redThreshold,
                 _enableRedPixelRemover,
@@ -220,7 +222,8 @@ namespace TestBookletProcessor.WPF
                 // Recreate the booklet processor with new settings
                 _bookletProcessor = new BookletProcessorService(
                     _pdfService,
-                    _imageProcessor,
+                    _deskewer,
+                    _aligner,
                     _redPixelRemover,
                     _redThreshold,
                     _enableRedPixelRemover,
