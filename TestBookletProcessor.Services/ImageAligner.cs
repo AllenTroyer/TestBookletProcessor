@@ -7,6 +7,16 @@ using TestBookletProcessor.Core.Interfaces;
 
 namespace TestBookletProcessor.Services
 {
+ /// <summary>
+ /// Original image alignment implementation using homography-based perspective transformation.
+ /// </summary>
+ /// <remarks>
+ /// DEPRECATED: This class has been superseded by <see cref="ImageAlignerAlt"/>,
+ /// which provides better alignment quality using affine transformation with ORB features,
+ /// Lowe's ratio test for match filtering, and configurable margin colors.
+ /// This class is kept for backward compatibility but will be removed in v2.0.
+ /// </remarks>
+ [Obsolete("Use ImageAlignerAlt for improved alignment quality. This class will be removed in v2.0.")]
  public class ImageAligner : IImageAligner
  {
  public async Task AlignImageAsync(string imagePath, string templatePath, string outputPath)

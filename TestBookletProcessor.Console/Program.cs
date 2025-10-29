@@ -23,7 +23,7 @@ class Program
         // Create service instances
         IPdfService pdfService = new PdfService();
         IDeskewer deskewer = new Deskewer();
-        IImageAligner aligner = new ImageAligner();
+        IImageAligner aligner = new ImageAlignerAlt();
         IRedPixelRemoverService redPixelRemover = new RedPixelRemoverService();
         byte redPixelThreshold = 225;
         bool enableRedPixelRemover = true;

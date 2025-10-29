@@ -77,44 +77,61 @@ namespace TestBookletProcessor.WPF
 
         private async void FolderMonitorJobService_FileDetected(object? sender, FolderFileDetectedEventArgs e)
         {
-            new ToastContentBuilder()
-            .AddText("Alignment Started")
-            .AddText($"Aligning detected file: {e.FilePath} with template: {e.TemplateFilePath}")
-            .Show(toast =>
+            try
             {
-                toast.ExpirationTime = DateTime.Now.AddSeconds(5);
-            });
-            //MessageBox.Show($"Aligning detected file:\n{e.FilePath}\nwith template:\n{e.TemplateFilePath}", "Alignment Started", MessageBoxButton.OK, MessageBoxImage.Information);
-            // add a toast message here instead of message box
-
-            // Use detected file and template for full booklet processing
-            var result = await _bookletProcessor.ProcessBookletsWorkflowAsync(
-                e.FilePath,
-                e.TemplateFilePath,
-                e.OutputFolder,
-                null);
-            //Dispatcher.Invoke(() =>
-            //{
-            if (result.Success)
-            {
-                var message = $"Processing complete! {result.PagesProcessed} booklets processed in {result.ProcessingTime:mm\\:ss}. Output: {result.OutputPath}";
-
                 new ToastContentBuilder()
-                    .AddText("Alignment Complete")
-                    .AddText(message)
-                    .Show(toast =>
-                    {
-                        toast.ExpirationTime = DateTime.Now.AddSeconds(5);
-                    });
-            }
-            else
-            {
-                Dispatcher.Invoke(() =>
+                .AddText("Alignment Started")
+                .AddText($"Aligning detected file: {e.FilePath} with template: {e.TemplateFilePath}")
+                .Show(toast =>
                 {
-                    MessageBox.Show($"Error: {result.ErrorMessage}", "Error", MessageBoxButton.OK, MessageBoxImage.Information);
+                    toast.ExpirationTime = DateTime.Now.AddSeconds(5);
                 });
+
+                // Use detected file and template for full booklet processing
+                var result = await _bookletProcessor.ProcessBookletsWorkflowAsync(
+                    e.FilePath,
+                    e.TemplateFilePath,
+                    e.OutputFolder,
+                    null);
+
+                if (result.Success)
+                {
+                    var message = $"Processing complete! {result.PagesProcessed} booklets processed in {result.ProcessingTime:mm\\:ss}. Output: {result.OutputPath}";
+
+                    new ToastContentBuilder()
+                        .AddText("Alignment Complete")
+                        .AddText(message)
+                        .Show(toast =>
+                        {
+                            toast.ExpirationTime = DateTime.Now.AddSeconds(5);
+                        });
+                }
+                else
+                {
+                    new ToastContentBuilder()
+     .AddText("Alignment Failed")
+              .AddText($"Error: {result.ErrorMessage}")
+      .Show(toast =>
+ {
+        toast.ExpirationTime = DateTime.Now.AddSeconds(10);
+             });
+     }
             }
-        }
+            catch (Exception ex)
+            {
+                // Show error toast notification
+                new ToastContentBuilder()
+     .AddText("Processing Error")
+          .AddText($"Failed to process file: {ex.Message}")
+          .Show(toast =>
+         {
+            toast.ExpirationTime = DateTime.Now.AddSeconds(10);
+             });
+
+             // Also log to console
+     Console.WriteLine($"Error processing file {e.FilePath}: {ex.Message}");
+         }
+   }
 
 
         private void BrowseInputPdf_Click(object sender, RoutedEventArgs e)
@@ -147,56 +164,66 @@ namespace TestBookletProcessor.WPF
 
         private async void ProcessButton_Click(object sender, RoutedEventArgs e)
         {
-            // Disable buttons and show progress bar
-            ProcessButton.IsEnabled = false;
-            BrowseInputButton.IsEnabled = false;
-            BrowseTemplateButton.IsEnabled = false;
-            ProcessingProgressBar.Visibility = Visibility.Visible;
-            ProcessingProgressBar.Value = 0;
-
-            string inputPdf = InputPdfTextBox.Text;
-            string templatePdf = TemplatePdfTextBox.Text;
-            if (!File.Exists(inputPdf) || !File.Exists(templatePdf))
+            try
             {
-                StatusTextBlock.Text = "Please select valid input and template PDF files.";
-                // Re-enable buttons and hide progress bar
+                // Disable buttons and show progress bar
+                ProcessButton.IsEnabled = false;
+                BrowseInputButton.IsEnabled = false;
+                BrowseTemplateButton.IsEnabled = false;
+                ProcessingProgressBar.Visibility = Visibility.Visible;
+                ProcessingProgressBar.Value = 0;
+
+                string inputPdf = InputPdfTextBox.Text;
+                string templatePdf = TemplatePdfTextBox.Text;
+                if (!File.Exists(inputPdf) || !File.Exists(templatePdf))
+                {
+                    StatusTextBlock.Text = "Please select valid input and template PDF files.";
+                    return;
+                }
+
+                string outputFolder = Path.Combine(Path.GetDirectoryName(inputPdf)!, "BookletOutput");
+                StatusTextBlock.Text = "Processing...";
+                int totalBooklets = 0;
+
+                var result = await _bookletProcessor.ProcessBookletsWorkflowAsync(
+                    inputPdf,
+                    templatePdf,
+                    outputFolder,
+                    (current, total) =>
+                    {
+                        Dispatcher.Invoke(() =>
+                        {
+                            StatusTextBlock.Text = $"Processing booklet {current} of {total}...";
+                            ProcessingProgressBar.Maximum = total;
+                            ProcessingProgressBar.Value = current;
+                        });
+                        totalBooklets = total;
+                    });
+
+                if (result.Success)
+                {
+                    StatusTextBlock.Text = $"Processing complete! {result.PagesProcessed} booklets processed in {result.ProcessingTime.ToString(@"mm\:ss")}. Output: {result.OutputPath}";
+                    ProcessingProgressBar.Value = totalBooklets;
+                }
+                else
+                {
+                    StatusTextBlock.Text = $"Error: {result.ErrorMessage}";
+                    ProcessingProgressBar.Value = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusTextBlock.Text = $"Processing failed: {ex.Message}";
+                ProcessingProgressBar.Value = 0;
+                MessageBox.Show($"An error occurred during processing:\n\n{ex.Message}", "Processing Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                // Always re-enable buttons and hide progress bar
                 ProcessButton.IsEnabled = true;
                 BrowseInputButton.IsEnabled = true;
                 BrowseTemplateButton.IsEnabled = true;
                 ProcessingProgressBar.Visibility = Visibility.Collapsed;
-                return;
-            }
-            string outputFolder = Path.Combine(Path.GetDirectoryName(inputPdf)!, "BookletOutput");
-            StatusTextBlock.Text = "Processing...";
-            int totalBooklets = 0;
-            var result = await _bookletProcessor.ProcessBookletsWorkflowAsync(
-                inputPdf,
-                templatePdf,
-                outputFolder,
-                (current, total) =>
-                {
-                    Dispatcher.Invoke(() =>
-                    {
-                        StatusTextBlock.Text = $"Processing booklet {current} of {total}...";
-                        ProcessingProgressBar.Maximum = total;
-                        ProcessingProgressBar.Value = current;
-                    });
-                    totalBooklets = total;
-                });
-            // Re-enable buttons and hide progress bar
-            ProcessButton.IsEnabled = true;
-            BrowseInputButton.IsEnabled = true;
-            BrowseTemplateButton.IsEnabled = true;
-            ProcessingProgressBar.Visibility = Visibility.Collapsed;
-
-            if (result.Success)
-            {
-                StatusTextBlock.Text = $"Processing complete! {result.PagesProcessed} booklets processed in {result.ProcessingTime.ToString(@"mm\:ss")}. Output: {result.OutputPath}";
-                ProcessingProgressBar.Value = totalBooklets;
-            }
-            else
-            {
-                StatusTextBlock.Text = $"Error: {result.ErrorMessage}";
             }
         }
 
