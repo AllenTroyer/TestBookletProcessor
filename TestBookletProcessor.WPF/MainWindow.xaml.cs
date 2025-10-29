@@ -15,7 +15,7 @@ namespace TestBookletProcessor.WPF
     {
         private readonly IPdfService _pdfService = new PdfService();
         private readonly IDeskewer _deskewer = new Deskewer();
-        private readonly IImageAligner _aligner = new ImageAligner();
+        private readonly IImageAligner _aligner = new ImageAlignerAlt();
         private readonly IRedPixelRemoverService _redPixelRemover = new RedPixelRemoverService();
         private BookletProcessorService _bookletProcessor;
         private IConfigurationRoot _config;
