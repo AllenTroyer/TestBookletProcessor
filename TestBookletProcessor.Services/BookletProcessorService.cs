@@ -15,7 +15,6 @@ public class BookletProcessorService
     private readonly IImageAligner _aligner;
     private readonly IRedPixelRemoverService? _redPixelRemover;
     private readonly byte _redThreshold;
-    private readonly bool _enableRedPixelRemover;
     private readonly int _dpi;
 
     public BookletProcessorService(
@@ -24,7 +23,6 @@ public class BookletProcessorService
         IImageAligner aligner,
         IRedPixelRemoverService? redPixelRemover = null,
         byte redThreshold = 200,
-        bool enableRedPixelRemover = false,
         int dpi = 300)
     {
         _pdfService = pdfService;
@@ -32,7 +30,6 @@ public class BookletProcessorService
         _aligner = aligner;
         _redPixelRemover = redPixelRemover;
         _redThreshold = redThreshold;
-        _enableRedPixelRemover = enableRedPixelRemover;
         _dpi = dpi;
     }
 
@@ -121,7 +118,7 @@ public class BookletProcessorService
             await _deskewer.DeskewImageAsync(inputImg, deskewedImg);
 
             string redRemovedImg = deskewedImg;
-            if (_enableRedPixelRemover && _redPixelRemover != null)
+            if (_redPixelRemover != null)
             {
                 redRemovedImg = Path.Combine(workingFolder, "red_removed_images", $"red_removed_{i + 1}.png");
                 Directory.CreateDirectory(Path.GetDirectoryName(redRemovedImg)!);

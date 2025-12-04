@@ -20,7 +20,7 @@ namespace TestBookletProcessor.WPF
         private BookletProcessorService _bookletProcessor;
         private IConfigurationRoot _config;
         private byte _redThreshold;
-        private bool _enableRedPixelRemover;
+        private bool _enableRedPixelRemover; // Used to decide whether to pass _redPixelRemover to BookletProcessorService
         private IFolderMonitorJobService _folderMonitorJobService;
         private string _tempFolder;
 
@@ -42,9 +42,8 @@ namespace TestBookletProcessor.WPF
                 _pdfService,
                 _deskewer,
                 _aligner,
-                _redPixelRemover,
+                _enableRedPixelRemover ? _redPixelRemover : null,
                 _redThreshold,
-                _enableRedPixelRemover,
                 dpi);
 
             Console.WriteLine($"Red pixel remover enabled: {_enableRedPixelRemover}");
@@ -251,9 +250,8 @@ namespace TestBookletProcessor.WPF
                     _pdfService,
                     _deskewer,
                     _aligner,
-                    _redPixelRemover,
+                    _enableRedPixelRemover ? _redPixelRemover : null,
                     _redThreshold,
-                    _enableRedPixelRemover,
                     dpi);
 
                 InputPdfTextBox.Text = _config["BookletProcessor:DefaultInputFolder"];
