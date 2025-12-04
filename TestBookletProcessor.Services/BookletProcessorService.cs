@@ -44,11 +44,16 @@ public class BookletProcessorService
     {
         var result = new ProcessingResult();
         var stopwatch = Stopwatch.StartNew();
-        string bookletsFolder = Path.Combine(outputFolder, "booklets");
+        
+        // Generate unique folder names based on input file name to prevent conflicts when processing multiple jobs simultaneously
+        var inputFileNameNoExt = Path.GetFileNameWithoutExtension(inputPdf);
+        var uniqueId = $"{inputFileNameNoExt}_{Guid.NewGuid():N}";
+        string jobTempFolder = Path.Combine(outputFolder, $"temp_{uniqueId}");
+        string bookletsFolder = Path.Combine(jobTempFolder, "booklets");
         var bookletWorkingFolders = new List<string>();
+        
         try
         {
-            var inputFileNameNoExt = Path.GetFileNameWithoutExtension(inputPdf);
             string finalOutputPdf = Path.Combine(outputFolder, $"{inputFileNameNoExt}_aligned.pdf");
             Directory.CreateDirectory(outputFolder);
             // Split input PDF into booklets
@@ -59,7 +64,7 @@ public class BookletProcessorService
             foreach (var bookletPath in bookletPaths)
             {
                 statusCallback?.Invoke(bookletIndex, totalBooklets);
-                string bookletWorkingFolder = Path.Combine(outputFolder, $"booklet_{bookletIndex}");
+                string bookletWorkingFolder = Path.Combine(jobTempFolder, $"booklet_{bookletIndex}");
                 bookletWorkingFolders.Add(bookletWorkingFolder);
                 string processedBookletOutput = Path.Combine(bookletWorkingFolder, "processed_booklet.pdf");
                 await ProcessBookletAsync(templatePdf, bookletPath, bookletWorkingFolder, processedBookletOutput, _dpi);
@@ -83,11 +88,8 @@ public class BookletProcessorService
         }
         finally
         {
-            PdfService.CleanupDirectory(bookletsFolder);
-            foreach (var folder in bookletWorkingFolders)
-            {
-                PdfService.CleanupDirectory(folder);
-            }
+            // Clean up the entire job temp folder (contains both booklets and booklet working folders)
+            PdfService.CleanupDirectory(jobTempFolder);
         }
         return result;
     }
