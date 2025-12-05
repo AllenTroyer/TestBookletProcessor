@@ -51,9 +51,9 @@ namespace TestBookletProcessor.WPF
             int qrWidth = int.TryParse(_config?["BookletProcessor:QrScanner:QrRegionWidth"], out var w) ? w : 600;
             int qrHeight = int.TryParse(_config?["BookletProcessor:QrScanner:QrRegionHeight"], out var h) ? h : 600;
             
-            var qrValuesSection = _config?.GetSection("BookletProcessor:QrScanner:QrValuesRequiringRedRemoval");
+            var qrValuesSection = _config?.GetSection("BookletProcessor:QrScanner:QrValuesExcludingRedRemoval");
             var qrValues = qrValuesSection?.GetChildren().Select(c => c.Value ?? "").ToList() ?? 
-                          new List<string> { "REDPEN", "TEACHER_MARKED", "MANUAL_GRADE" };
+                          new List<string> { "MACHINE_SCORED", "NO_RED_INK", "CLEAN" };
 
             _bookletProcessor = new BookletProcessorService(
                 _pdfService,
@@ -279,9 +279,9 @@ namespace TestBookletProcessor.WPF
                 int qrWidth = int.TryParse(_config?["BookletProcessor:QrScanner:QrRegionWidth"], out var w) ? w : 600;
                 int qrHeight = int.TryParse(_config?["BookletProcessor:QrScanner:QrRegionHeight"], out var h) ? h : 600;
                 
-                var qrValuesSection = _config?.GetSection("BookletProcessor:QrScanner:QrValuesRequiringRedRemoval");
+                var qrValuesSection = _config?.GetSection("BookletProcessor:QrScanner:QrValuesExcludingRedRemoval");
                 var qrValues = qrValuesSection?.GetChildren().Select(c => c.Value ?? "").ToList() ?? 
-                              new List<string> { "REDPEN", "TEACHER_MARKED", "MANUAL_GRADE" };
+                              new List<string> { "MACHINE_SCORED", "NO_RED_INK", "CLEAN" };
 
                 // Recreate the booklet processor with new settings
                 _bookletProcessor = new BookletProcessorService(

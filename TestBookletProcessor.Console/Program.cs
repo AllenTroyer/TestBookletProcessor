@@ -1,9 +1,9 @@
+using Microsoft.Extensions.Configuration;
+using QrRegionScanner;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
-using QrRegionScanner;
 using TestBookletProcessor.Core.Interfaces;
 using TestBookletProcessor.Core.Models;
 using TestBookletProcessor.Services;
@@ -17,9 +17,9 @@ partial class Program
         Console.WriteLine("1. QR Code Scanner Test");
         Console.WriteLine("2. Booklet Processing Test");
         Console.Write("Enter choice (1 or 2): ");
-        
+
         var choice = Console.ReadLine();
-        
+
         if (choice == "1")
         {
             await TestQrCodeScanner();
@@ -37,12 +37,12 @@ partial class Program
     static async Task TestQrCodeScanner()
     {
         Console.WriteLine("\n=== QR Code Scanner Test ===");
-        
+
         // Path to test image
         string testImagePath = @"C:\TestBooklets\Input\test_page.png";
-        
+
         Console.WriteLine($"Test image path: {testImagePath}");
-        
+
         if (!File.Exists(testImagePath))
         {
             Console.WriteLine($"ERROR: Test image not found at {testImagePath}");
@@ -53,27 +53,27 @@ partial class Program
         try
         {
             var scanner = new RegionQrScanner();
-            
+
             // For an 8.5 x 11 inch page at 300 DPI:
             // Total image size: 2550 x 3300 pixels
             // QR code region: 2 x 2 inch square = 600 x 600 pixels
             // Lower right corner position: x = 2550 - 600 = 1950, y = 3300 - 600 = 2700
-            
+
             int pageWidthPixels = 2550;  // 8.5 inches * 300 DPI
             int pageHeightPixels = 3300; // 11 inches * 300 DPI
             int qrSizePixels = 600;      // 2 inches * 300 DPI
-            
+
             int qrX = pageWidthPixels - qrSizePixels;  // 1950
             int qrY = pageHeightPixels - qrSizePixels; // 2700
-            
+
             Console.WriteLine($"\nScanning region:");
             Console.WriteLine($"  X: {qrX}, Y: {qrY}");
             Console.WriteLine($"  Width: {qrSizePixels}, Height: {qrSizePixels}");
             Console.WriteLine($"  (Lower right corner, 2x2 inch square at 300 DPI)");
-            
+
             Console.WriteLine("\nScanning for QR code...");
             string? result = scanner.ScanRegion(testImagePath, qrX, qrY, qrSizePixels, qrSizePixels);
-            
+
             if (result != null)
             {
                 Console.WriteLine($"\n? SUCCESS: QR code found!");
@@ -87,12 +87,12 @@ partial class Program
                 Console.WriteLine("  - Ensure the QR code is in the lower right 2x2 inch area");
                 Console.WriteLine("  - Check that the QR code is clear and not distorted");
             }
-            
+
             // Also test with byte array method
             Console.WriteLine("\nTesting with byte array method...");
             byte[] imageData = await File.ReadAllBytesAsync(testImagePath);
             string? result2 = scanner.ScanRegion(imageData, qrX, qrY, qrSizePixels, qrSizePixels);
-            
+
             if (result2 != null)
             {
                 Console.WriteLine($"? Byte array method also successful: {result2}");
@@ -103,7 +103,7 @@ partial class Program
             Console.WriteLine($"\nERROR: {ex.Message}");
             Console.WriteLine($"Stack trace: {ex.StackTrace}");
         }
-        
+
         Console.WriteLine("\nTest completed. Press any key to exit.");
         Console.ReadKey();
     }
@@ -111,7 +111,7 @@ partial class Program
     static async Task TestBookletProcessing()
     {
         Console.WriteLine("\n=== Booklet Processing Test ===");
-        
+
         // Load configuration from appsettings.json
         var config = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
@@ -119,9 +119,9 @@ partial class Program
             .Build();
 
         // Paths for testing
-        string templatePdf = @"C:\TestBooklets\Input\template.pdf";
+        string templatePdf = @"C:\TestBooklets\Templates\template.pdf";
         string inputPdf = @"C:\TestBooklets\Input\input.pdf";
-        string workingFolder = @"C:\TestBooklets\Working";
+        string workingFolder = @"C:\TestBooklets\Output";
         string outputPdf = @"C:\TestBooklets\Output\final_output.pdf";
 
         // Ensure working/output folders exist
@@ -131,25 +131,25 @@ partial class Program
         // Read settings from appsettings.json
         var redThresholdStr = config?["BookletProcessor:RedPixelThreshold"];
         byte redPixelThreshold = byte.TryParse(redThresholdStr, out var thresholdVal) ? thresholdVal : (byte)200;
-        
+
         var enableRedStr = config?["BookletProcessor:EnableRedPixelRemover"];
         bool enableRedPixelRemover = enableRedStr != null && enableRedStr.Equals("true", StringComparison.OrdinalIgnoreCase);
-        
+
         var dpiStr = config?["BookletProcessor:DefaultDpi"];
         int dpi = int.TryParse(dpiStr, out var dpiVal) ? dpiVal : 300;
 
         // Load QR scanner configuration
         var enableQrStr = config?["BookletProcessor:QrScanner:EnableQrScanning"];
         bool enableQrScanning = enableQrStr != null && enableQrStr.Equals("true", StringComparison.OrdinalIgnoreCase);
-        
+
         int qrX = int.TryParse(config?["BookletProcessor:QrScanner:QrRegionX"], out var x) ? x : 1950;
         int qrY = int.TryParse(config?["BookletProcessor:QrScanner:QrRegionY"], out var y) ? y : 2700;
         int qrWidth = int.TryParse(config?["BookletProcessor:QrScanner:QrRegionWidth"], out var w) ? w : 600;
         int qrHeight = int.TryParse(config?["BookletProcessor:QrScanner:QrRegionHeight"], out var h) ? h : 600;
-        
-        var qrValuesSection = config?.GetSection("BookletProcessor:QrScanner:QrValuesRequiringRedRemoval");
-        var qrValues = qrValuesSection?.GetChildren().Select(c => c.Value ?? "").ToList() ?? 
-                      new List<string> { "REDPEN", "TEACHER_MARKED", "MANUAL_GRADE" };
+
+        var qrValuesSection = config?.GetSection("BookletProcessor:QrScanner:QrValuesExcludingRedRemoval");
+        var qrValues = qrValuesSection?.GetChildren().Select(c => c.Value ?? "").ToList() ??
+                      new List<string> { "MACHINE_SCORED", "NO_RED_INK", "CLEAN" };
 
         Console.WriteLine($"Red pixel remover enabled: {enableRedPixelRemover}");
         Console.WriteLine($"Red pixel threshold: {redPixelThreshold}");
@@ -158,7 +158,7 @@ partial class Program
         if (enableQrScanning)
         {
             Console.WriteLine($"QR region: X={qrX}, Y={qrY}, Width={qrWidth}, Height={qrHeight}");
-            Console.WriteLine($"QR values requiring red removal: {string.Join(", ", qrValues)}");
+            Console.WriteLine($"QR values excluding red removal: {string.Join(", ", qrValues)}");
         }
 
         // Create service instances
@@ -193,7 +193,7 @@ partial class Program
         {
             Console.WriteLine($"Test failed: {ex.Message}");
         }
-        
+
         Console.WriteLine("\nPress any key to exit.");
         Console.ReadKey();
     }

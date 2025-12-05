@@ -24,7 +24,7 @@ public class BookletProcessorService
     private readonly int _qrRegionY;
     private readonly int _qrRegionWidth;
     private readonly int _qrRegionHeight;
-    private readonly List<string> _qrValuesRequiringRedRemoval;
+    private readonly List<string> _qrValuesExcludingRedRemoval;
 
     public BookletProcessorService(
         IPdfService pdfService,
@@ -39,7 +39,7 @@ public class BookletProcessorService
         int qrRegionY = 2700,
         int qrRegionWidth = 600,
         int qrRegionHeight = 600,
-        List<string>? qrValuesRequiringRedRemoval = null)
+        List<string>? qrValuesExcludingRedRemoval = null)
     {
         _pdfService = pdfService;
         _deskewer = deskewer;
@@ -53,8 +53,8 @@ public class BookletProcessorService
         _qrRegionY = qrRegionY;
         _qrRegionWidth = qrRegionWidth;
         _qrRegionHeight = qrRegionHeight;
-        _qrValuesRequiringRedRemoval = qrValuesRequiringRedRemoval ??
-                                       new List<string> { "REDPEN", "TEACHER_MARKED", "MANUAL_GRADE" };
+        _qrValuesExcludingRedRemoval = qrValuesExcludingRedRemoval ??
+                                       new List<string> { "APT24A-FRTCVR", "APT24B-FRTCVR", "CLEAN" };
     }
 
     public async Task<ProcessingResult> ProcessBookletsWorkflowAsync(
@@ -158,17 +158,18 @@ public class BookletProcessorService
                     {
                         Console.WriteLine($"Page {i + 1}: QR code detected: {qrCodeValue}");
 
-                        // Check if QR code value requires red pixel removal
-                        shouldApplyRedRemoval = _redPixelRemover != null &&
-                                                _qrValuesRequiringRedRemoval.Any(v =>
-                                                    qrCodeValue.Contains(v, StringComparison.OrdinalIgnoreCase));
+                        // Check if QR code value excludes red pixel removal
+                        var qrMatchesExclusionList = _qrValuesExcludingRedRemoval.Any(v =>
+                            qrCodeValue.Contains(v, StringComparison.OrdinalIgnoreCase));
 
-                        if (shouldApplyRedRemoval)
+                        shouldApplyRedRemoval = _redPixelRemover != null && !qrMatchesExclusionList;
+
+                        if (qrMatchesExclusionList)
                             Console.WriteLine(
-                                $"Page {i + 1}: QR code matches removal criteria - applying red pixel removal");
+                                $"Page {i + 1}: QR code matches exclusion criteria - skipping red pixel removal");
                         else
                             Console.WriteLine(
-                                $"Page {i + 1}: QR code does not match removal criteria - skipping red pixel removal");
+                                $"Page {i + 1}: QR code does not match exclusion criteria - applying red pixel removal");
                     }
                     else
                     {
