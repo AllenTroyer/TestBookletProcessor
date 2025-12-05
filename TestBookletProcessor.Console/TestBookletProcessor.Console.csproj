@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\QrRegionScanner\QrRegionScanner.csproj" />
     <ProjectReference Include="..\TestBookletProcessor.Core\TestBookletProcessor.Core.csproj" />
     <ProjectReference Include="..\TestBookletProcessor.Services\TestBookletProcessor.Services.csproj" />
   </ItemGroup>
