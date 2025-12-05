@@ -138,15 +138,35 @@ partial class Program
         var dpiStr = config?["BookletProcessor:DefaultDpi"];
         int dpi = int.TryParse(dpiStr, out var dpiVal) ? dpiVal : 300;
 
+        // Load QR scanner configuration
+        var enableQrStr = config?["BookletProcessor:QrScanner:EnableQrScanning"];
+        bool enableQrScanning = enableQrStr != null && enableQrStr.Equals("true", StringComparison.OrdinalIgnoreCase);
+        
+        int qrX = int.TryParse(config?["BookletProcessor:QrScanner:QrRegionX"], out var x) ? x : 1950;
+        int qrY = int.TryParse(config?["BookletProcessor:QrScanner:QrRegionY"], out var y) ? y : 2700;
+        int qrWidth = int.TryParse(config?["BookletProcessor:QrScanner:QrRegionWidth"], out var w) ? w : 600;
+        int qrHeight = int.TryParse(config?["BookletProcessor:QrScanner:QrRegionHeight"], out var h) ? h : 600;
+        
+        var qrValuesSection = config?.GetSection("BookletProcessor:QrScanner:QrValuesRequiringRedRemoval");
+        var qrValues = qrValuesSection?.GetChildren().Select(c => c.Value ?? "").ToList() ?? 
+                      new List<string> { "REDPEN", "TEACHER_MARKED", "MANUAL_GRADE" };
+
         Console.WriteLine($"Red pixel remover enabled: {enableRedPixelRemover}");
         Console.WriteLine($"Red pixel threshold: {redPixelThreshold}");
         Console.WriteLine($"DPI: {dpi}");
+        Console.WriteLine($"QR scanning enabled: {enableQrScanning}");
+        if (enableQrScanning)
+        {
+            Console.WriteLine($"QR region: X={qrX}, Y={qrY}, Width={qrWidth}, Height={qrHeight}");
+            Console.WriteLine($"QR values requiring red removal: {string.Join(", ", qrValues)}");
+        }
 
         // Create service instances
         IPdfService pdfService = new PdfService();
         IDeskewer deskewer = new Deskewer();
         IImageAligner aligner = new ImageAlignerAlt();
         IRedPixelRemoverService redPixelRemover = new RedPixelRemoverService();
+        RegionQrScanner qrScanner = new RegionQrScanner();
 
         var bookletProcessor = new BookletProcessorService(
         pdfService,
@@ -154,7 +174,14 @@ partial class Program
         aligner,
         enableRedPixelRemover ? redPixelRemover : null,
         redPixelThreshold,
-        dpi
+        dpi,
+        enableQrScanning ? qrScanner : null,
+        enableQrScanning,
+        qrX,
+        qrY,
+        qrWidth,
+        qrHeight,
+        qrValues
         );
 
         try

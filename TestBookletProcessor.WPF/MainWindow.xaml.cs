@@ -2,9 +2,12 @@
 using Microsoft.Toolkit.Uwp.Notifications;
 using Microsoft.Win32;
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using QrRegionScanner;
 using TestBookletProcessor.Core.Interfaces;
 using TestBookletProcessor.Core.Models;
 using TestBookletProcessor.Services;
@@ -17,6 +20,7 @@ namespace TestBookletProcessor.WPF
         private readonly IDeskewer _deskewer = new Deskewer();
         private readonly IImageAligner _aligner = new ImageAlignerAlt();
         private readonly IRedPixelRemoverService _redPixelRemover = new RedPixelRemoverService();
+        private readonly RegionQrScanner _qrScanner = new RegionQrScanner();
         private BookletProcessorService _bookletProcessor;
         private IConfigurationRoot _config;
         private byte _redThreshold;
@@ -38,15 +42,36 @@ namespace TestBookletProcessor.WPF
             var dpiStr = _config?["BookletProcessor:DefaultDpi"];
             var dpi = int.TryParse(dpiStr, out var dpiVal) ? dpiVal : 300;
 
+            // Load QR scanner configuration
+            var enableQrStr = _config?["BookletProcessor:QrScanner:EnableQrScanning"];
+            bool enableQrScanning = enableQrStr != null && enableQrStr.Equals("true", StringComparison.OrdinalIgnoreCase);
+            
+            int qrX = int.TryParse(_config?["BookletProcessor:QrScanner:QrRegionX"], out var x) ? x : 1950;
+            int qrY = int.TryParse(_config?["BookletProcessor:QrScanner:QrRegionY"], out var y) ? y : 2700;
+            int qrWidth = int.TryParse(_config?["BookletProcessor:QrScanner:QrRegionWidth"], out var w) ? w : 600;
+            int qrHeight = int.TryParse(_config?["BookletProcessor:QrScanner:QrRegionHeight"], out var h) ? h : 600;
+            
+            var qrValuesSection = _config?.GetSection("BookletProcessor:QrScanner:QrValuesRequiringRedRemoval");
+            var qrValues = qrValuesSection?.GetChildren().Select(c => c.Value ?? "").ToList() ?? 
+                          new List<string> { "REDPEN", "TEACHER_MARKED", "MANUAL_GRADE" };
+
             _bookletProcessor = new BookletProcessorService(
                 _pdfService,
                 _deskewer,
                 _aligner,
                 _enableRedPixelRemover ? _redPixelRemover : null,
                 _redThreshold,
-                dpi);
+                dpi,
+                enableQrScanning ? _qrScanner : null,
+                enableQrScanning,
+                qrX,
+                qrY,
+                qrWidth,
+                qrHeight,
+                qrValues);
 
             Console.WriteLine($"Red pixel remover enabled: {_enableRedPixelRemover}");
+            Console.WriteLine($"QR scanning enabled: {enableQrScanning}");
 
             // Set default folders from config
             InputPdfTextBox.Text = _config["BookletProcessor:DefaultInputFolder"];
@@ -245,6 +270,19 @@ namespace TestBookletProcessor.WPF
                 var dpiStr = _config?["BookletProcessor:DefaultDpi"];
                 var dpi = int.TryParse(dpiStr, out var dpiVal) ? dpiVal : 300;
 
+                // Load QR scanner configuration
+                var enableQrStr = _config?["BookletProcessor:QrScanner:EnableQrScanning"];
+                bool enableQrScanning = enableQrStr != null && enableQrStr.Equals("true", StringComparison.OrdinalIgnoreCase);
+                
+                int qrX = int.TryParse(_config?["BookletProcessor:QrScanner:QrRegionX"], out var x) ? x : 1950;
+                int qrY = int.TryParse(_config?["BookletProcessor:QrScanner:QrRegionY"], out var y) ? y : 2700;
+                int qrWidth = int.TryParse(_config?["BookletProcessor:QrScanner:QrRegionWidth"], out var w) ? w : 600;
+                int qrHeight = int.TryParse(_config?["BookletProcessor:QrScanner:QrRegionHeight"], out var h) ? h : 600;
+                
+                var qrValuesSection = _config?.GetSection("BookletProcessor:QrScanner:QrValuesRequiringRedRemoval");
+                var qrValues = qrValuesSection?.GetChildren().Select(c => c.Value ?? "").ToList() ?? 
+                              new List<string> { "REDPEN", "TEACHER_MARKED", "MANUAL_GRADE" };
+
                 // Recreate the booklet processor with new settings
                 _bookletProcessor = new BookletProcessorService(
                     _pdfService,
@@ -252,7 +290,14 @@ namespace TestBookletProcessor.WPF
                     _aligner,
                     _enableRedPixelRemover ? _redPixelRemover : null,
                     _redThreshold,
-                    dpi);
+                    dpi,
+                    enableQrScanning ? _qrScanner : null,
+                    enableQrScanning,
+                    qrX,
+                    qrY,
+                    qrWidth,
+                    qrHeight,
+                    qrValues);
 
                 InputPdfTextBox.Text = _config["BookletProcessor:DefaultInputFolder"];
                 TemplatePdfTextBox.Text = _config["BookletProcessor:DefaultTemplateFolder"];
