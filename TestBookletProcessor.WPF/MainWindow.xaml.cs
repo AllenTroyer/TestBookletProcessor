@@ -46,10 +46,10 @@ namespace TestBookletProcessor.WPF
             var enableQrStr = _config?["BookletProcessor:QrScanner:EnableQrScanning"];
             bool enableQrScanning = enableQrStr != null && enableQrStr.Equals("true", StringComparison.OrdinalIgnoreCase);
             
-            int qrX = int.TryParse(_config?["BookletProcessor:QrScanner:QrRegionX"], out var x) ? x : 1950;
-            int qrY = int.TryParse(_config?["BookletProcessor:QrScanner:QrRegionY"], out var y) ? y : 2700;
-            int qrWidth = int.TryParse(_config?["BookletProcessor:QrScanner:QrRegionWidth"], out var w) ? w : 600;
-            int qrHeight = int.TryParse(_config?["BookletProcessor:QrScanner:QrRegionHeight"], out var h) ? h : 600;
+            double qrXInches = double.TryParse(_config?["BookletProcessor:QrScanner:QrRegionXInches"], out var xi) ? xi : 6.5;
+            double qrYInches = double.TryParse(_config?["BookletProcessor:QrScanner:QrRegionYInches"], out var yi) ? yi : 9.0;
+            double qrWidthInches = double.TryParse(_config?["BookletProcessor:QrScanner:QrRegionWidthInches"], out var wi) ? wi : 2.0;
+            double qrHeightInches = double.TryParse(_config?["BookletProcessor:QrScanner:QrRegionHeightInches"], out var hi) ? hi : 2.0;
             
             var qrValuesSection = _config?.GetSection("BookletProcessor:QrScanner:QrValuesExcludingRedRemoval");
             var qrValues = qrValuesSection?.GetChildren().Select(c => c.Value ?? "").ToList() ?? 
@@ -64,10 +64,10 @@ namespace TestBookletProcessor.WPF
                 dpi,
                 enableQrScanning ? _qrScanner : null,
                 enableQrScanning,
-                qrX,
-                qrY,
-                qrWidth,
-                qrHeight,
+                qrXInches,
+                qrYInches,
+                qrWidthInches,
+                qrHeightInches,
                 qrValues);
 
             Console.WriteLine($"Red pixel remover enabled: {_enableRedPixelRemover}");
@@ -274,10 +274,10 @@ namespace TestBookletProcessor.WPF
                 var enableQrStr = _config?["BookletProcessor:QrScanner:EnableQrScanning"];
                 bool enableQrScanning = enableQrStr != null && enableQrStr.Equals("true", StringComparison.OrdinalIgnoreCase);
                 
-                int qrX = int.TryParse(_config?["BookletProcessor:QrScanner:QrRegionX"], out var x) ? x : 1950;
-                int qrY = int.TryParse(_config?["BookletProcessor:QrScanner:QrRegionY"], out var y) ? y : 2700;
-                int qrWidth = int.TryParse(_config?["BookletProcessor:QrScanner:QrRegionWidth"], out var w) ? w : 600;
-                int qrHeight = int.TryParse(_config?["BookletProcessor:QrScanner:QrRegionHeight"], out var h) ? h : 600;
+                double qrXInches = double.TryParse(_config?["BookletProcessor:QrScanner:QrRegionXInches"], out var xi) ? xi : 6.5;
+                double qrYInches = double.TryParse(_config?["BookletProcessor:QrScanner:QrRegionYInches"], out var yi) ? yi : 9.0;
+                double qrWidthInches = double.TryParse(_config?["BookletProcessor:QrScanner:QrRegionWidthInches"], out var wi) ? wi : 2.0;
+                double qrHeightInches = double.TryParse(_config?["BookletProcessor:QrScanner:QrRegionHeightInches"], out var hi) ? hi : 2.0;
                 
                 var qrValuesSection = _config?.GetSection("BookletProcessor:QrScanner:QrValuesExcludingRedRemoval");
                 var qrValues = qrValuesSection?.GetChildren().Select(c => c.Value ?? "").ToList() ?? 
@@ -293,10 +293,10 @@ namespace TestBookletProcessor.WPF
                     dpi,
                     enableQrScanning ? _qrScanner : null,
                     enableQrScanning,
-                    qrX,
-                    qrY,
-                    qrWidth,
-                    qrHeight,
+                    qrXInches,
+                    qrYInches,
+                    qrWidthInches,
+                    qrHeightInches,
                     qrValues);
 
                 InputPdfTextBox.Text = _config["BookletProcessor:DefaultInputFolder"];

@@ -141,12 +141,12 @@ partial class Program
         // Load QR scanner configuration
         var enableQrStr = config?["BookletProcessor:QrScanner:EnableQrScanning"];
         bool enableQrScanning = enableQrStr != null && enableQrStr.Equals("true", StringComparison.OrdinalIgnoreCase);
-
-        int qrX = int.TryParse(config?["BookletProcessor:QrScanner:QrRegionX"], out var x) ? x : 1950;
-        int qrY = int.TryParse(config?["BookletProcessor:QrScanner:QrRegionY"], out var y) ? y : 2700;
-        int qrWidth = int.TryParse(config?["BookletProcessor:QrScanner:QrRegionWidth"], out var w) ? w : 600;
-        int qrHeight = int.TryParse(config?["BookletProcessor:QrScanner:QrRegionHeight"], out var h) ? h : 600;
-
+        
+        double qrXInches = double.TryParse(config?["BookletProcessor:QrScanner:QrRegionXInches"], out var xi) ? xi : 6.5;
+        double qrYInches = double.TryParse(config?["BookletProcessor:QrScanner:QrRegionYInches"], out var yi) ? yi : 9.0;
+        double qrWidthInches = double.TryParse(config?["BookletProcessor:QrScanner:QrRegionWidthInches"], out var wi) ? wi : 2.0;
+        double qrHeightInches = double.TryParse(config?["BookletProcessor:QrScanner:QrRegionHeightInches"], out var hi) ? hi : 2.0;
+        
         var qrValuesSection = config?.GetSection("BookletProcessor:QrScanner:QrValuesExcludingRedRemoval");
         var qrValues = qrValuesSection?.GetChildren().Select(c => c.Value ?? "").ToList() ??
                       new List<string> { "MACHINE_SCORED", "NO_RED_INK", "CLEAN" };
@@ -157,7 +157,8 @@ partial class Program
         Console.WriteLine($"QR scanning enabled: {enableQrScanning}");
         if (enableQrScanning)
         {
-            Console.WriteLine($"QR region: X={qrX}, Y={qrY}, Width={qrWidth}, Height={qrHeight}");
+            Console.WriteLine($"QR region (inches): X={qrXInches:F2}, Y={qrYInches:F2}, Width={qrWidthInches:F2}, Height={qrHeightInches:F2}");
+            Console.WriteLine($"QR region (pixels @ {dpi} DPI): X={qrXInches * dpi:F0}, Y={qrYInches * dpi:F0}, Width={qrWidthInches * dpi:F0}, Height={qrHeightInches * dpi:F0}");
             Console.WriteLine($"QR values excluding red removal: {string.Join(", ", qrValues)}");
         }
 
@@ -177,10 +178,10 @@ partial class Program
         dpi,
         enableQrScanning ? qrScanner : null,
         enableQrScanning,
-        qrX,
-        qrY,
-        qrWidth,
-        qrHeight,
+        qrXInches,
+        qrYInches,
+        qrWidthInches,
+        qrHeightInches,
         qrValues
         );
 

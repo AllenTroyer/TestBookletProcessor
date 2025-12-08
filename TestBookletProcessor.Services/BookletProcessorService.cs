@@ -35,10 +35,10 @@ public class BookletProcessorService
         int dpi = 300,
         RegionQrScanner? qrScanner = null,
         bool enableQrScanning = false,
-        int qrRegionX = 1950,
-        int qrRegionY = 2700,
-        int qrRegionWidth = 600,
-        int qrRegionHeight = 600,
+        double qrRegionXInches = 6.5,
+        double qrRegionYInches = 9.0,
+        double qrRegionWidthInches = 2.0,
+        double qrRegionHeightInches = 2.0,
         List<string>? qrValuesExcludingRedRemoval = null)
     {
         _pdfService = pdfService;
@@ -49,12 +49,15 @@ public class BookletProcessorService
         _redThreshold = redThreshold;
         _dpi = dpi;
         _enableQrScanning = enableQrScanning;
-        _qrRegionX = qrRegionX;
-        _qrRegionY = qrRegionY;
-        _qrRegionWidth = qrRegionWidth;
-        _qrRegionHeight = qrRegionHeight;
+        
+        // Calculate pixel values from inches and DPI
+        _qrRegionX = (int)(qrRegionXInches * dpi);
+        _qrRegionY = (int)(qrRegionYInches * dpi);
+        _qrRegionWidth = (int)(qrRegionWidthInches * dpi);
+        _qrRegionHeight = (int)(qrRegionHeightInches * dpi);
+        
         _qrValuesExcludingRedRemoval = qrValuesExcludingRedRemoval ??
-                                       new List<string> { "APT24A-FRTCVR", "APT24B-FRTCVR", "CLEAN" };
+                                       new List<string> { "MACHINE_SCORED", "NO_RED_INK", "CLEAN" };
     }
 
     public async Task<ProcessingResult> ProcessBookletsWorkflowAsync(
@@ -136,8 +139,8 @@ public class BookletProcessorService
             var inputImg = Path.Combine(workingFolder, "input_images", $"input_{i + 1}.png");
             Directory.CreateDirectory(Path.GetDirectoryName(templateImg)!);
             Directory.CreateDirectory(Path.GetDirectoryName(inputImg)!);
-            await _pdfService.ConvertPageToImageAsync(templatePages[i], 1, templateImg);
-            await _pdfService.ConvertPageToImageAsync(inputPages[i], 1, inputImg);
+            await _pdfService.ConvertPageToImageAsync(templatePages[i], 1, templateImg, dpi);
+            await _pdfService.ConvertPageToImageAsync(inputPages[i], 1, inputImg, dpi);
 
             //3. Deskew and align input image to template image
             var deskewedImg = Path.Combine(workingFolder, "deskewed_images", $"deskewed_{i + 1}.png");

@@ -5,6 +5,7 @@ using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Metadata;
 using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
@@ -75,7 +76,7 @@ public class PdfService : IPdfService
         });
     }
 
-    public async Task ConvertPageToImageAsync(string pdfPath, int pageNumber, string outputImagePath)
+    public async Task ConvertPageToImageAsync(string pdfPath, int pageNumber, string outputImagePath, int dpi = 300)
     {
         await Task.Run(() =>
         {
@@ -99,7 +100,11 @@ public class PdfService : IPdfService
                 Directory.CreateDirectory(Path.GetDirectoryName(outputImagePath)!);
             }
 
-            using (var docReader = DocLib.Instance.GetDocReader(pdfPath, new PageDimensions(1080, 1920)))
+            // Calculate page dimensions based on DPI for US Letter size (8.5 x 11 inches)
+            int pageWidthPixels = (int)(8.5 * dpi);
+            int pageHeightPixels = (int)(11 * dpi);
+
+            using (var docReader = DocLib.Instance.GetDocReader(pdfPath, new PageDimensions(pageWidthPixels, pageHeightPixels)))
             {
                 using (var pageReader = docReader.GetPageReader(pageNumber - 1))
                 {
@@ -109,6 +114,11 @@ public class PdfService : IPdfService
 
                     using (var image = new SixLabors.ImageSharp.Image<Rgba32>(pageWidth, pageHeight))
                     {
+                        // Set DPI metadata
+                        image.Metadata.HorizontalResolution = dpi;
+                        image.Metadata.VerticalResolution = dpi;
+                        image.Metadata.ResolutionUnits = PixelResolutionUnit.PixelsPerInch;
+
                         image.ProcessPixelRows(accessor =>
                         {
                             for (int y = 0; y < pageHeight; y++)
