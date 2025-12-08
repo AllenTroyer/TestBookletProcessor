@@ -161,9 +161,9 @@ public class BookletProcessorService
                     {
                         Console.WriteLine($"Page {i + 1}: QR code detected: {qrCodeValue}");
 
-                        // Check if QR code value excludes red pixel removal
-                        var qrMatchesExclusionList = _qrValuesExcludingRedRemoval.Any(v =>
-                            qrCodeValue.Contains(v, StringComparison.OrdinalIgnoreCase));
+                        // Check if QR code value matches any exclusion pattern (supports wildcards)
+                        var qrMatchesExclusionList = _qrValuesExcludingRedRemoval.Any(pattern =>
+                            MatchesWildcard(qrCodeValue, pattern, ignoreCase: true));
 
                         shouldApplyRedRemoval = _redPixelRemover != null && !qrMatchesExclusionList;
 
@@ -208,5 +208,30 @@ public class BookletProcessorService
         //5. Merge all processed PDFs into final output
         await _pdfService.MergePdfsAsync(processedPdfPages, outputPdf);
         Console.WriteLine($"Final output PDF created: {outputPdf}");
+    }
+
+    /// <summary>
+    /// Checks if a value matches a wildcard pattern.
+    /// Supports * for one or more characters.
+    /// </summary>
+    /// <param name="value">The value to check</param>
+    /// <param name="pattern">The pattern with wildcards (* for one or more characters)</param>
+    /// <param name="ignoreCase">Whether to ignore case</param>
+    /// <returns>True if the value matches the pattern</returns>
+    private static bool MatchesWildcard(string value, string pattern, bool ignoreCase = true)
+    {
+        if (string.IsNullOrEmpty(pattern))
+            return false;
+
+        // Convert wildcard pattern to regex pattern
+        // Escape special regex characters except *
+        var regexPattern = "^" + System.Text.RegularExpressions.Regex.Escape(pattern)
+            .Replace("\\*", ".*") + "$";
+
+        var options = ignoreCase 
+            ? System.Text.RegularExpressions.RegexOptions.IgnoreCase 
+            : System.Text.RegularExpressions.RegexOptions.None;
+
+        return System.Text.RegularExpressions.Regex.IsMatch(value, regexPattern, options);
     }
 }

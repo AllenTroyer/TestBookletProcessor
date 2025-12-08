@@ -1,12 +1,38 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows10.0.17763.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <UseWPF>true</UseWPF>
-  </PropertyGroup>
+<PropertyGroup>
+  <OutputType>WinExe</OutputType>
+  <TargetFramework>net8.0-windows10.0.17763.0</TargetFramework>
+  <Nullable>enable</Nullable>
+  <ImplicitUsings>enable</ImplicitUsings>
+  <UseWPF>true</UseWPF>
+    
+  <!-- Version Information -->
+  <Version>1.0.0</Version>
+  <AssemblyVersion>1.0.0.0</AssemblyVersion>
+  <FileVersion>1.0.0.0</FileVersion>
+  <InformationalVersion>1.0.0</InformationalVersion>
+    
+  <!-- Application Information -->
+  <Product>Test Booklet Processor</Product>
+  <Company>Catforms LLC</Company>
+  <Copyright>Copyright © 2025</Copyright>
+  <Description>Test booklet processing application with QR code scanning and red pixel removal</Description>
+    
+  <!-- Publishing Configuration -->
+  <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+  <SelfContained>true</SelfContained>
+  <PublishSingleFile>false</PublishSingleFile>
+  <IncludeNativeLibrariesForSelfContained>true</IncludeNativeLibrariesForSelfContained>
+  <PackageIcon>booklet.png</PackageIcon>
+</PropertyGroup>
+
+<ItemGroup>
+  <None Include="..\..\..\..\Dropbox\Data\Catforms\Graphics\Logo\booklet.png">
+    <Pack>True</Pack>
+    <PackagePath>\</PackagePath>
+  </None>
+</ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\TestBookletProcessor.Core\TestBookletProcessor.Core.csproj" />

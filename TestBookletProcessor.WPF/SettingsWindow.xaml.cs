@@ -2,9 +2,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Win32;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using Newtonsoft.Json.Linq;
+using System;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 
 namespace TestBookletProcessor.WPF
@@ -31,19 +34,65 @@ namespace TestBookletProcessor.WPF
                 InputFolderTextBox.Text = bp?["DefaultInputFolder"]?.ToString() ?? "";
                 TemplateFolderTextBox.Text = bp?["DefaultTemplateFolder"]?.ToString() ?? "";
                 OutputFolderTextBox.Text = bp?["DefaultOutputFolder"]?.ToString() ?? "";
-                
+
+                // Load Default DPI
+                var dpiStr = bp?["DefaultDpi"]?.ToString();
+                DefaultDpiTextBox.Text = int.TryParse(dpiStr, out var dpiVal) ? dpiVal.ToString() : "300";
+
                 // Load RedPixelRemover settings
                 var enableRedStr = bp?["EnableRedPixelRemover"]?.ToString();
                 EnableRedPixelRemoverCheckBox.IsChecked = enableRedStr != null && enableRedStr.Equals("true", StringComparison.OrdinalIgnoreCase);
-                
+
                 var thresholdStr = bp?["RedPixelThreshold"]?.ToString();
                 RedPixelThresholdTextBox.Text = byte.TryParse(thresholdStr, out var val) ? val.ToString() : "200";
+
+                // Load QR Scanner settings
+                var qrScanner = bp?["QrScanner"];
+                if (qrScanner != null)
+                {
+                    var enableQrStr = qrScanner["EnableQrScanning"]?.ToString();
+                    EnableQrScanningCheckBox.IsChecked = enableQrStr != null && enableQrStr.Equals("true", StringComparison.OrdinalIgnoreCase);
+
+                    QrRegionXTextBox.Text = qrScanner["QrRegionXInches"]?.ToString() ?? "6.5";
+                    QrRegionYTextBox.Text = qrScanner["QrRegionYInches"]?.ToString() ?? "9.0";
+                    QrRegionWidthTextBox.Text = qrScanner["QrRegionWidthInches"]?.ToString() ?? "2.0";
+                    QrRegionHeightTextBox.Text = qrScanner["QrRegionHeightInches"]?.ToString() ?? "2.0";
+
+                    // Load exclusion patterns as comma-separated string
+                    var exclusionArray = qrScanner["QrValuesExcludingRedRemoval"] as JArray;
+                    if (exclusionArray != null)
+                    {
+                        var patterns = exclusionArray.Select(t => t.ToString()).ToArray();
+                        QrExclusionPatternsTextBox.Text = string.Join(", ", patterns);
+                    }
+                    else
+                    {
+                        QrExclusionPatternsTextBox.Text = "*-FRTCVR, CLEAN";
+                    }
+                }
+                else
+                {
+                    // Default QR scanner settings
+                    EnableQrScanningCheckBox.IsChecked = false;
+                    QrRegionXTextBox.Text = "6.5";
+                    QrRegionYTextBox.Text = "9.0";
+                    QrRegionWidthTextBox.Text = "2.0";
+                    QrRegionHeightTextBox.Text = "2.0";
+                    QrExclusionPatternsTextBox.Text = "*-FRTCVR, CLEAN";
+                }
             }
             else
             {
                 _configJson = new JObject();
+                DefaultDpiTextBox.Text = "300";
                 EnableRedPixelRemoverCheckBox.IsChecked = true;
                 RedPixelThresholdTextBox.Text = "200";
+                EnableQrScanningCheckBox.IsChecked = false;
+                QrRegionXTextBox.Text = "6.5";
+                QrRegionYTextBox.Text = "9.0";
+                QrRegionWidthTextBox.Text = "2.0";
+                QrRegionHeightTextBox.Text = "2.0";
+                QrExclusionPatternsTextBox.Text = "*-FRTCVR, CLEAN";
             }
         }
 
@@ -76,6 +125,13 @@ namespace TestBookletProcessor.WPF
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
+            // Validate Default DPI
+            if (!int.TryParse(DefaultDpiTextBox.Text, out int dpi) || dpi < 72 || dpi > 600)
+            {
+                MessageBox.Show("Default DPI must be a number between 72 and 600.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
             // Validate RedPixelThreshold
             if (!byte.TryParse(RedPixelThresholdTextBox.Text, out byte threshold))
             {
@@ -83,14 +139,65 @@ namespace TestBookletProcessor.WPF
                 return;
             }
 
+            // Validate QR region coordinates
+            if (!double.TryParse(QrRegionXTextBox.Text, out double qrX) || qrX < 0)
+            {
+                MessageBox.Show("QR Region X must be a positive number.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            if (!double.TryParse(QrRegionYTextBox.Text, out double qrY) || qrY < 0)
+            {
+                MessageBox.Show("QR Region Y must be a positive number.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            if (!double.TryParse(QrRegionWidthTextBox.Text, out double qrWidth) || qrWidth <= 0)
+            {
+                MessageBox.Show("QR Region Width must be a positive number.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            if (!double.TryParse(QrRegionHeightTextBox.Text, out double qrHeight) || qrHeight <= 0)
+            {
+                MessageBox.Show("QR Region Height must be a positive number.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
             if (_configJson["BookletProcessor"] == null)
                 _configJson["BookletProcessor"] = new JObject();
             var bp = (JObject)_configJson["BookletProcessor"]!;
+
             bp["DefaultInputFolder"] = InputFolderTextBox.Text;
             bp["DefaultTemplateFolder"] = TemplateFolderTextBox.Text;
             bp["DefaultOutputFolder"] = OutputFolderTextBox.Text;
+            bp["DefaultDpi"] = dpi;
             bp["EnableRedPixelRemover"] = EnableRedPixelRemoverCheckBox.IsChecked == true;
             bp["RedPixelThreshold"] = threshold;
+
+            // Save QR Scanner settings
+            if (bp["QrScanner"] == null)
+                bp["QrScanner"] = new JObject();
+            var qrScanner = (JObject)bp["QrScanner"]!;
+
+            qrScanner["EnableQrScanning"] = EnableQrScanningCheckBox.IsChecked == true;
+            qrScanner["QrRegionXInches"] = qrX;
+            qrScanner["QrRegionYInches"] = qrY;
+            qrScanner["QrRegionWidthInches"] = qrWidth;
+            qrScanner["QrRegionHeightInches"] = qrHeight;
+
+            // Parse and save exclusion patterns
+            var patternsText = QrExclusionPatternsTextBox.Text?.Trim() ?? "";
+            if (!string.IsNullOrEmpty(patternsText))
+            {
+                var patterns = patternsText.Split(new[] { ',', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(p => p.Trim())
+                    .Where(p => !string.IsNullOrEmpty(p))
+                    .ToArray();
+                qrScanner["QrValuesExcludingRedRemoval"] = new JArray(patterns);
+            }
+            else
+            {
+                qrScanner["QrValuesExcludingRedRemoval"] = new JArray();
+            }
+
             File.WriteAllText(_configPath, _configJson.ToString());
             this.DialogResult = true;
             this.Close();
@@ -108,9 +215,23 @@ namespace TestBookletProcessor.WPF
             e.Handled = !IsTextNumeric(e.Text);
         }
 
+        private void DecimalTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            // Allow numeric input and decimal point
+            e.Handled = !IsTextDecimal(e.Text, ((TextBox)sender).Text);
+        }
+
         private static bool IsTextNumeric(string text)
         {
             return Regex.IsMatch(text, "^[0-9]+$");
+        }
+
+        private static bool IsTextDecimal(string input, string currentText)
+        {
+            // Allow digits and one decimal point
+            if (input == "." && !currentText.Contains("."))
+                return true;
+            return Regex.IsMatch(input, "^[0-9]+$");
         }
     }
 }

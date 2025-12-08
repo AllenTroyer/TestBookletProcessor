@@ -1,8 +1,15 @@
 <Window x:Class="TestBookletProcessor.WPF.SettingsWindow"
 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-Title="Settings" Height="380" Width="500">
+Title="Settings" Height="650" Width="550">
  <Grid Margin="20">
+ <Grid.RowDefinitions>
+ <RowDefinition Height="*"/>
+ <RowDefinition Height="Auto"/>
+ </Grid.RowDefinitions>
+ 
+ <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+ <Grid>
  <Grid.RowDefinitions>
  <RowDefinition Height="Auto"/>
  <RowDefinition Height="Auto"/>
@@ -10,7 +17,14 @@ Title="Settings" Height="380" Width="500">
  <RowDefinition Height="Auto"/>
  <RowDefinition Height="Auto"/>
  <RowDefinition Height="Auto"/>
- <RowDefinition Height="*"/>
+ <RowDefinition Height="10"/>
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="Auto"/>
  </Grid.RowDefinitions>
  <Grid.ColumnDefinitions>
  <ColumnDefinition Width="Auto"/>
@@ -30,15 +44,51 @@ Title="Settings" Height="380" Width="500">
  <TextBox x:Name="OutputFolderTextBox" Grid.Row="2" Grid.Column="1" Margin="0,0,10,10"/>
  <Button Content="Browse..." Grid.Row="2" Grid.Column="2" Margin="0,0,0,10" Click="BrowseOutputFolder_Click"/>
 
- <TextBlock Text="Enable Red Pixel Remover:" Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,10"/>
- <CheckBox x:Name="EnableRedPixelRemoverCheckBox" Grid.Row="3" Grid.Column="1" VerticalAlignment="Center" Margin="0,0,10,10"/>
+ <TextBlock Text="Default DPI:" Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,10"/>
+ <TextBox x:Name="DefaultDpiTextBox" Grid.Row="3" Grid.Column="1" Margin="0,0,10,10" PreviewTextInput="RedPixelThresholdTextBox_PreviewTextInput"
+          ToolTip="Resolution for PDF to image conversion (typically 150-600)"/>
 
- <TextBlock Text="Red Pixel Threshold (0-255):" Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,10"/>
- <TextBox x:Name="RedPixelThresholdTextBox" Grid.Row="4" Grid.Column="1" Margin="0,0,10,10" PreviewTextInput="RedPixelThresholdTextBox_PreviewTextInput"/>
+ <TextBlock Text="Enable Red Pixel Remover:" Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,10"/>
+ <CheckBox x:Name="EnableRedPixelRemoverCheckBox" Grid.Row="4" Grid.Column="1" VerticalAlignment="Center" Margin="0,0,10,10"/>
 
- <StackPanel Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
- <Button Content="Save" Width="80" Margin="0,0,10,0" Click="SaveButton_Click"/>
- <Button Content="Cancel" Width="80" Click="CancelButton_Click"/>
+ <TextBlock Text="Red Pixel Threshold (0-255):" Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,10"/>
+ <TextBox x:Name="RedPixelThresholdTextBox" Grid.Row="5" Grid.Column="1" Margin="0,0,10,10" PreviewTextInput="RedPixelThresholdTextBox_PreviewTextInput"/>
+
+ <!-- Separator -->
+ <Separator Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,5"/>
+
+ <!-- QR Scanner Settings -->
+ <TextBlock Text="QR Scanner Settings" Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="3" FontWeight="Bold" Margin="0,0,0,10"/>
+
+ <TextBlock Text="Enable QR Scanning:" Grid.Row="8" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,10"/>
+ <CheckBox x:Name="EnableQrScanningCheckBox" Grid.Row="8" Grid.Column="1" VerticalAlignment="Center" Margin="0,0,10,10"/>
+
+ <TextBlock Text="QR Region X (inches):" Grid.Row="9" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,10"/>
+ <TextBox x:Name="QrRegionXTextBox" Grid.Row="9" Grid.Column="1" Margin="0,0,10,10" PreviewTextInput="DecimalTextBox_PreviewTextInput"/>
+
+ <TextBlock Text="QR Region Y (inches):" Grid.Row="10" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,10"/>
+ <TextBox x:Name="QrRegionYTextBox" Grid.Row="10" Grid.Column="1" Margin="0,0,10,10" PreviewTextInput="DecimalTextBox_PreviewTextInput"/>
+
+ <TextBlock Text="QR Region Width (inches):" Grid.Row="11" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,10"/>
+ <TextBox x:Name="QrRegionWidthTextBox" Grid.Row="11" Grid.Column="1" Margin="0,0,10,10" PreviewTextInput="DecimalTextBox_PreviewTextInput"/>
+
+ <TextBlock Text="QR Region Height (inches):" Grid.Row="12" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,10"/>
+ <TextBox x:Name="QrRegionHeightTextBox" Grid.Row="12" Grid.Column="1" Margin="0,0,10,10" PreviewTextInput="DecimalTextBox_PreviewTextInput"/>
+
+ <TextBlock Text="QR Exclusion Patterns:" Grid.Row="13" Grid.Column="0" VerticalAlignment="Top" Margin="0,5,10,10"/>
+ <TextBox x:Name="QrExclusionPatternsTextBox" Grid.Row="13" Grid.Column="1" Grid.ColumnSpan="2" 
+          Margin="0,0,0,10" Height="60" TextWrapping="Wrap" AcceptsReturn="True" 
+          VerticalScrollBarVisibility="Auto"
+          ToolTip="Enter patterns separated by commas. Supports wildcards (*). Example: *-FRTCVR, CLEAN"/>
+ </Grid>
+ </ScrollViewer>
+ 
+ <!-- Button Panel - Fixed at bottom -->
+ <Border Grid.Row="1" BorderBrush="LightGray" BorderThickness="0,1,0,0" Padding="0,10,0,0" Background="White">
+ <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+ <Button Content="Save" Width="80" Height="28" Margin="0,0,10,0" Click="SaveButton_Click"/>
+ <Button Content="Cancel" Width="80" Height="28" Click="CancelButton_Click"/>
  </StackPanel>
+ </Border>
  </Grid>
 </Window>
