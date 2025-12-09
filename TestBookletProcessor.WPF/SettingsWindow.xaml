@@ -27,6 +27,9 @@ Title="Settings" Height="650" Width="550">
  <RowDefinition Height="Auto"/>
  <RowDefinition Height="Auto"/>
  <RowDefinition Height="Auto"/>
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="Auto"/>
  </Grid.RowDefinitions>
  <Grid.ColumnDefinitions>
  <ColumnDefinition Width="Auto"/>
@@ -89,6 +92,20 @@ Title="Settings" Height="650" Width="550">
           Margin="0,0,0,10" Height="60" TextWrapping="Wrap" AcceptsReturn="True" 
           VerticalScrollBarVisibility="Auto"
           ToolTip="Enter template name patterns separated by commas. Supports wildcards (*). Example: *TEMPLATE*, *BLANK*, *SAMPLE*&#x0a;Templates matching these patterns will skip both QR scanning and red pixel removal."/>
+
+ <!-- Scanned Sheet Settings -->
+ <TextBlock Text="Scanned Sheet Settings" Grid.Row="16" Grid.Column="0" Grid.ColumnSpan="3" 
+            FontWeight="Bold" Margin="0,15,0,10"/>
+
+ <TextBlock Text="Scanned Sheet Template Name:" Grid.Row="17" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,10"/>
+ <TextBox x:Name="ScannedSheetTemplateNameTextBox" Grid.Row="17" Grid.Column="1" Grid.ColumnSpan="2" 
+          Margin="0,0,0,10"
+          ToolTip="Template filename for scanned sheet mode (e.g., Template_ScannedSheets.pdf)"/>
+
+ <TextBlock Text="Info: When this template is used, each page is individually aligned based on its QR code." 
+            Grid.Row="18" Grid.Column="0" Grid.ColumnSpan="3" 
+            TextWrapping="Wrap" FontStyle="Italic" Foreground="Gray" Margin="0,0,0,10"/>
+
  </Grid>
  </ScrollViewer>
  

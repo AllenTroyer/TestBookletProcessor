@@ -124,7 +124,7 @@ partial class Program
             .Build();
 
         // Paths for testing
-        string templatePdf = @"C:\TestBooklets\Templates\Template_CAT1B.pdf";
+        string templatePdf = @"C:\TestBooklets\Templates\Template_ScannedSheets.pdf";
         string inputPdf = @"C:\TestBooklets\Input\input.pdf";
         string workingFolder = @"C:\TestBooklets\Output";
         string outputPdf = @"C:\TestBooklets\Output\final_output.pdf";
@@ -173,12 +173,53 @@ partial class Program
         }
         Console.WriteLine($"Template exclusion patterns: {string.Join(", ", templateExclusionPatterns)}");
 
+        // Load Scanned Sheet Configuration
+        var scannedSheetTemplateName = config?["BookletProcessor:ScannedSheets:TemplateName"];
+        var scannedSheetQrMappingSection = config?.GetSection("BookletProcessor:ScannedSheets:QrToPageMapping");
+        var scannedSheetQrMapping = new Dictionary<string, int>();
+        if (scannedSheetQrMappingSection != null)
+        {
+            foreach (var child in scannedSheetQrMappingSection.GetChildren())
+            {
+                if (child.Key != null && int.TryParse(child.Value, out var pageIndex))
+                {
+                    scannedSheetQrMapping[child.Key] = pageIndex;
+                }
+            }
+        }
+
+        if (!string.IsNullOrEmpty(scannedSheetTemplateName))
+        {
+            Console.WriteLine($"Scanned sheet template: {scannedSheetTemplateName}");
+            Console.WriteLine($"Scanned sheet QR mappings: {scannedSheetQrMapping.Count} patterns");
+        }
+
         // Create service instances
         IPdfService pdfService = new PdfService();
         IDeskewer deskewer = new Deskewer();
         IImageAligner aligner = new ImageAlignerAlt();
         IRedPixelRemoverService redPixelRemover = new RedPixelRemoverService();
         RegionQrScanner qrScanner = new RegionQrScanner();
+
+        // Create scanned sheet processor if configured
+        IScannedSheetProcessor? scannedSheetProcessor = null;
+        if (!string.IsNullOrEmpty(scannedSheetTemplateName))
+        {
+            scannedSheetProcessor = new ScannedSheetProcessorService(
+                pdfService,
+                deskewer,
+                aligner,
+                enableRedPixelRemover ? redPixelRemover : null,
+                redPixelThreshold,
+                enableQrScanning ? qrScanner : null,
+                enableQrScanning,
+                qrXInches,
+                qrYInches,
+                qrWidthInches,
+                qrHeightInches,
+                dpi,
+                qrValues);
+        }
 
         var bookletProcessor = new BookletProcessorService(
         pdfService,
@@ -194,7 +235,10 @@ partial class Program
         qrWidthInches,
         qrHeightInches,
         qrValues,
-        templateExclusionPatterns
+        templateExclusionPatterns,
+        scannedSheetProcessor,
+        scannedSheetTemplateName,
+        scannedSheetQrMapping
         );
 
         try

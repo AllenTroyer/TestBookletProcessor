@@ -59,6 +59,41 @@ namespace TestBookletProcessor.WPF
             var templateExclusionSection = _config?.GetSection("BookletProcessor:TemplateExclusionPatterns");
             var templateExclusionPatterns = templateExclusionSection?.GetChildren().Select(c => c.Value ?? "").ToList() ??
                           new List<string> { "*TEMPLATE*", "*BLANK*", "*SAMPLE*" };
+            
+            // Load Scanned Sheet Configuration
+            var scannedSheetTemplateName = _config?["BookletProcessor:ScannedSheets:TemplateName"];
+            var scannedSheetQrMappingSection = _config?.GetSection("BookletProcessor:ScannedSheets:QrToPageMapping");
+            var scannedSheetQrMapping = new Dictionary<string, int>();
+            if (scannedSheetQrMappingSection != null)
+            {
+                foreach (var child in scannedSheetQrMappingSection.GetChildren())
+                {
+                    if (child.Key != null && int.TryParse(child.Value, out var pageIndex))
+                    {
+                        scannedSheetQrMapping[child.Key] = pageIndex;
+                    }
+                }
+            }
+            
+            // Create scanned sheet processor
+            IScannedSheetProcessor? scannedSheetProcessor = null;
+            if (!string.IsNullOrEmpty(scannedSheetTemplateName))
+            {
+                scannedSheetProcessor = new ScannedSheetProcessorService(
+                    _pdfService,
+                    _deskewer,
+                    _aligner,
+                    _enableRedPixelRemover ? _redPixelRemover : null,
+                    _redThreshold,
+                    enableQrScanning ? _qrScanner : null,
+                    enableQrScanning,
+                    qrXInches,
+                    qrYInches,
+                    qrWidthInches,
+                    qrHeightInches,
+                    dpi,
+                    qrValues);
+            }
 
             _bookletProcessor = new BookletProcessorService(
                 _pdfService,
@@ -74,7 +109,10 @@ namespace TestBookletProcessor.WPF
                 qrWidthInches,
                 qrHeightInches,
                 qrValues,
-                templateExclusionPatterns);
+                templateExclusionPatterns,
+                scannedSheetProcessor,
+                scannedSheetTemplateName,
+                scannedSheetQrMapping);
 
             Console.WriteLine($"Red pixel remover enabled: {_enableRedPixelRemover}");
             Console.WriteLine($"QR scanning enabled: {enableQrScanning}");
@@ -293,6 +331,41 @@ namespace TestBookletProcessor.WPF
                 var templateExclusionSection = _config?.GetSection("BookletProcessor:TemplateExclusionPatterns");
                 var templateExclusionPatterns = templateExclusionSection?.GetChildren().Select(c => c.Value ?? "").ToList() ??
                               new List<string> { "*TEMPLATE*", "*BLANK*", "*SAMPLE*" };
+                
+                // Load Scanned Sheet Configuration
+                var scannedSheetTemplateName = _config?["BookletProcessor:ScannedSheets:TemplateName"];
+                var scannedSheetQrMappingSection = _config?.GetSection("BookletProcessor:ScannedSheets:QrToPageMapping");
+                var scannedSheetQrMapping = new Dictionary<string, int>();
+                if (scannedSheetQrMappingSection != null)
+                {
+                    foreach (var child in scannedSheetQrMappingSection.GetChildren())
+                    {
+                        if (child.Key != null && int.TryParse(child.Value, out var pageIndex))
+                        {
+                            scannedSheetQrMapping[child.Key] = pageIndex;
+                        }
+                    }
+                }
+                
+                // Create scanned sheet processor
+                IScannedSheetProcessor? scannedSheetProcessor = null;
+                if (!string.IsNullOrEmpty(scannedSheetTemplateName))
+                {
+                    scannedSheetProcessor = new ScannedSheetProcessorService(
+                        _pdfService,
+                        _deskewer,
+                        _aligner,
+                        _enableRedPixelRemover ? _redPixelRemover : null,
+                        _redThreshold,
+                        enableQrScanning ? _qrScanner : null,
+                        enableQrScanning,
+                        qrXInches,
+                        qrYInches,
+                        qrWidthInches,
+                        qrHeightInches,
+                        dpi,
+                        qrValues);
+                }
 
                 // Recreate the booklet processor with new settings
                 _bookletProcessor = new BookletProcessorService(
@@ -309,7 +382,10 @@ namespace TestBookletProcessor.WPF
                     qrWidthInches,
                     qrHeightInches,
                     qrValues,
-                    templateExclusionPatterns);
+                    templateExclusionPatterns,
+                    scannedSheetProcessor,
+                    scannedSheetTemplateName,
+                    scannedSheetQrMapping);
 
                 InputPdfTextBox.Text = _config["BookletProcessor:DefaultInputFolder"];
                 TemplatePdfTextBox.Text = _config["BookletProcessor:DefaultTemplateFolder"];

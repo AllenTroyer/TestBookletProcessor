@@ -26,6 +26,9 @@ public class BookletProcessorService
     private readonly int _qrRegionHeight;
     private readonly List<string> _qrValuesExcludingRedRemoval;
     private readonly List<string> _templateExclusionPatterns;
+    private readonly IScannedSheetProcessor? _scannedSheetProcessor;
+    private readonly string? _scannedSheetTemplateName;
+    private readonly Dictionary<string, int> _scannedSheetQrMapping;
 
     public BookletProcessorService(
         IPdfService pdfService,
@@ -41,7 +44,10 @@ public class BookletProcessorService
         double qrRegionWidthInches = 2.0,
         double qrRegionHeightInches = 2.0,
         List<string>? qrValuesExcludingRedRemoval = null,
-        List<string>? templateExclusionPatterns = null)
+        List<string>? templateExclusionPatterns = null,
+        IScannedSheetProcessor? scannedSheetProcessor = null,
+        string? scannedSheetTemplateName = null,
+        Dictionary<string, int>? scannedSheetQrMapping = null)
     {
         _pdfService = pdfService;
         _deskewer = deskewer;
@@ -63,9 +69,67 @@ public class BookletProcessorService
         
         _templateExclusionPatterns = templateExclusionPatterns ??
                                     new List<string> { "*TEMPLATE*", "*BLANK*", "*SAMPLE*" };
+        
+        _scannedSheetProcessor = scannedSheetProcessor;
+        _scannedSheetTemplateName = scannedSheetTemplateName;
+        _scannedSheetQrMapping = scannedSheetQrMapping ?? new Dictionary<string, int>();
     }
 
     public async Task<ProcessingResult> ProcessBookletsWorkflowAsync(
+        string inputPdf,
+        string templatePdf,
+        string outputFolder,
+        Action<int, int>? statusCallback = null)
+    {
+        // Auto-detect processing mode based on template name
+        if (IsScannedSheetMode(templatePdf))
+        {
+            Console.WriteLine("Auto-detected: Scanned Sheet Mode");
+            return await ProcessScannedSheetWorkflowAsync(inputPdf, templatePdf, outputFolder, statusCallback);
+        }
+        
+        Console.WriteLine("Processing Mode: Booklet Mode");
+        return await ProcessBookletWorkflowAsync(inputPdf, templatePdf, outputFolder, statusCallback);
+    }
+
+    private bool IsScannedSheetMode(string templatePdf)
+    {
+        if (string.IsNullOrEmpty(_scannedSheetTemplateName))
+            return false;
+
+        var templateFileName = Path.GetFileName(templatePdf);
+        return templateFileName.Equals(_scannedSheetTemplateName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task<ProcessingResult> ProcessScannedSheetWorkflowAsync(
+        string inputPdf,
+        string templatePdf,
+        string outputFolder,
+        Action<int, int>? statusCallback = null)
+    {
+        if (_scannedSheetProcessor == null)
+        {
+            return new ProcessingResult
+            {
+                Success = false,
+                ErrorMessage = "Scanned sheet processor not initialized"
+            };
+        }
+
+        var inputFileNameNoExt = Path.GetFileNameWithoutExtension(inputPdf);
+        var finalOutputPdf = Path.Combine(outputFolder, $"{inputFileNameNoExt}_aligned.pdf");
+
+        return await _scannedSheetProcessor.ProcessScannedSheetsAsync(
+            inputPdf,
+            templatePdf,
+            _scannedSheetQrMapping,
+            outputFolder,
+            finalOutputPdf,
+            _dpi,
+            statusCallback);
+    }
+
+    private async Task<ProcessingResult> ProcessBookletWorkflowAsync(
         string inputPdf,
         string templatePdf,
         string outputFolder,

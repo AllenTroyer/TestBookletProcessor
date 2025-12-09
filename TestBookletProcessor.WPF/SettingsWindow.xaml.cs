@@ -92,6 +92,17 @@ namespace TestBookletProcessor.WPF
                 {
                     TemplateExclusionPatternsTextBox.Text = "*TEMPLATE*, *BLANK*, *SAMPLE*";
                 }
+                
+                // Load Scanned Sheet Settings
+                var scannedSheets = bp?["ScannedSheets"];
+                if (scannedSheets != null)
+                {
+                    ScannedSheetTemplateNameTextBox.Text = scannedSheets["TemplateName"]?.ToString() ?? "Template_ScannedSheets.pdf";
+                }
+                else
+                {
+                    ScannedSheetTemplateNameTextBox.Text = "Template_ScannedSheets.pdf";
+                }
             }
             else
             {
@@ -106,6 +117,7 @@ namespace TestBookletProcessor.WPF
                 QrRegionHeightTextBox.Text = "2.0";
                 QrExclusionPatternsTextBox.Text = "*-FRTCVR, CLEAN";
                 TemplateExclusionPatternsTextBox.Text = "*TEMPLATE*, *BLANK*, *SAMPLE*";
+                ScannedSheetTemplateNameTextBox.Text = "Template_ScannedSheets.pdf";
             }
         }
 
@@ -225,6 +237,22 @@ namespace TestBookletProcessor.WPF
             {
                 bp["TemplateExclusionPatterns"] = new JArray();
             }
+            
+            // Save Scanned Sheet Settings
+            if (bp["ScannedSheets"] == null)
+                bp["ScannedSheets"] = new JObject();
+            var scannedSheets = (JObject)bp["ScannedSheets"]!;
+            
+            var scannedSheetTemplateName = ScannedSheetTemplateNameTextBox.Text?.Trim() ?? "";
+            if (!string.IsNullOrEmpty(scannedSheetTemplateName))
+            {
+                scannedSheets["TemplateName"] = scannedSheetTemplateName;
+            }
+            else
+            {
+                scannedSheets["TemplateName"] = "Template_ScannedSheets.pdf";
+            }
+            // Note: QrToPageMapping is not edited here - users should edit appsettings.json directly
 
             File.WriteAllText(_configPath, _configJson.ToString());
             this.DialogResult = true;
