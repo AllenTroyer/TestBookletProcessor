@@ -147,7 +147,17 @@ notepad TestBookletProcessor.WPF\appsettings.json
 
 **Test in Console:**
 ```csharp
+// In TestBookletProcessing() method:
 string templatePdf = @"C:\TestBooklets\Templates\Template_ScannedSheets.pdf";
+string inputPdf = @"C:\TestBooklets\Input\input.pdf";
+string outputFolder = @"C:\TestBooklets\Output";
+
+// The ProcessBookletsWorkflowAsync method will auto-detect scanned sheet mode
+var result = await bookletProcessor.ProcessBookletsWorkflowAsync(
+    inputPdf, 
+    templatePdf, 
+    outputFolder, 
+    null);
 ```
 
 ## Support

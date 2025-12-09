@@ -124,14 +124,14 @@ partial class Program
             .Build();
 
         // Paths for testing
+        // To test Scanned Sheet Mode: use Template_ScannedSheets.pdf
+        // To test Booklet Mode: use any other template (e.g., Template_CAT1B.pdf)
         string templatePdf = @"C:\TestBooklets\Templates\Template_ScannedSheets.pdf";
         string inputPdf = @"C:\TestBooklets\Input\input.pdf";
-        string workingFolder = @"C:\TestBooklets\Output";
-        string outputPdf = @"C:\TestBooklets\Output\final_output.pdf";
+        string outputFolder = @"C:\TestBooklets\Output";
 
-        // Ensure working/output folders exist
-        Directory.CreateDirectory(workingFolder);
-        Directory.CreateDirectory(Path.GetDirectoryName(outputPdf)!);
+        // Ensure output folder exists
+        Directory.CreateDirectory(outputFolder);
 
         // Read settings from appsettings.json
         var redThresholdStr = config?["BookletProcessor:RedPixelThreshold"];
@@ -243,8 +243,23 @@ partial class Program
 
         try
         {
-            await bookletProcessor.ProcessBookletAsync(templatePdf, inputPdf, workingFolder, outputPdf, dpi);
-            Console.WriteLine("Test completed successfully.");
+            // Use ProcessBookletsWorkflowAsync which includes auto-detection for scanned sheet mode
+            var result = await bookletProcessor.ProcessBookletsWorkflowAsync(
+                inputPdf, 
+                templatePdf, 
+                outputFolder, 
+                null); // No progress callback for console
+            
+            if (result.Success)
+            {
+                Console.WriteLine("Test completed successfully.");
+                Console.WriteLine($"Output: {result.OutputPath}");
+                Console.WriteLine($"Pages processed: {result.PagesProcessed}");
+            }
+            else
+            {
+                Console.WriteLine($"Test failed: {result.ErrorMessage}");
+            }
         }
         catch (Exception ex)
         {
