@@ -54,6 +54,11 @@ namespace TestBookletProcessor.WPF
             var qrValuesSection = _config?.GetSection("BookletProcessor:QrScanner:QrValuesExcludingRedRemoval");
             var qrValues = qrValuesSection?.GetChildren().Select(c => c.Value ?? "").ToList() ?? 
                           new List<string> { "MACHINE_SCORED", "NO_RED_INK", "CLEAN" };
+            
+            // Load Template Exclusion Patterns
+            var templateExclusionSection = _config?.GetSection("BookletProcessor:TemplateExclusionPatterns");
+            var templateExclusionPatterns = templateExclusionSection?.GetChildren().Select(c => c.Value ?? "").ToList() ??
+                          new List<string> { "*TEMPLATE*", "*BLANK*", "*SAMPLE*" };
 
             _bookletProcessor = new BookletProcessorService(
                 _pdfService,
@@ -68,7 +73,8 @@ namespace TestBookletProcessor.WPF
                 qrYInches,
                 qrWidthInches,
                 qrHeightInches,
-                qrValues);
+                qrValues,
+                templateExclusionPatterns);
 
             Console.WriteLine($"Red pixel remover enabled: {_enableRedPixelRemover}");
             Console.WriteLine($"QR scanning enabled: {enableQrScanning}");
@@ -282,6 +288,11 @@ namespace TestBookletProcessor.WPF
                 var qrValuesSection = _config?.GetSection("BookletProcessor:QrScanner:QrValuesExcludingRedRemoval");
                 var qrValues = qrValuesSection?.GetChildren().Select(c => c.Value ?? "").ToList() ?? 
                               new List<string> { "MACHINE_SCORED", "NO_RED_INK", "CLEAN" };
+                
+                // Load Template Exclusion Patterns
+                var templateExclusionSection = _config?.GetSection("BookletProcessor:TemplateExclusionPatterns");
+                var templateExclusionPatterns = templateExclusionSection?.GetChildren().Select(c => c.Value ?? "").ToList() ??
+                              new List<string> { "*TEMPLATE*", "*BLANK*", "*SAMPLE*" };
 
                 // Recreate the booklet processor with new settings
                 _bookletProcessor = new BookletProcessorService(
@@ -297,7 +308,8 @@ namespace TestBookletProcessor.WPF
                     qrYInches,
                     qrWidthInches,
                     qrHeightInches,
-                    qrValues);
+                    qrValues,
+                    templateExclusionPatterns);
 
                 InputPdfTextBox.Text = _config["BookletProcessor:DefaultInputFolder"];
                 TemplatePdfTextBox.Text = _config["BookletProcessor:DefaultTemplateFolder"];

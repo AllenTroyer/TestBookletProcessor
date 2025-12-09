@@ -150,6 +150,11 @@ partial class Program
         var qrValuesSection = config?.GetSection("BookletProcessor:QrScanner:QrValuesExcludingRedRemoval");
         var qrValues = qrValuesSection?.GetChildren().Select(c => c.Value ?? "").ToList() ??
                       new List<string> { "MACHINE_SCORED", "NO_RED_INK", "CLEAN" };
+        
+        // Load Template Exclusion Patterns
+        var templateExclusionSection = config?.GetSection("BookletProcessor:TemplateExclusionPatterns");
+        var templateExclusionPatterns = templateExclusionSection?.GetChildren().Select(c => c.Value ?? "").ToList() ??
+                      new List<string> { "*TEMPLATE*", "*BLANK*", "*SAMPLE*" };
 
         Console.WriteLine($"Red pixel remover enabled: {enableRedPixelRemover}");
         Console.WriteLine($"Red pixel threshold: {redPixelThreshold}");
@@ -161,6 +166,7 @@ partial class Program
             Console.WriteLine($"QR region (pixels @ {dpi} DPI): X={qrXInches * dpi:F0}, Y={qrYInches * dpi:F0}, Width={qrWidthInches * dpi:F0}, Height={qrHeightInches * dpi:F0}");
             Console.WriteLine($"QR values excluding red removal: {string.Join(", ", qrValues)}");
         }
+        Console.WriteLine($"Template exclusion patterns: {string.Join(", ", templateExclusionPatterns)}");
 
         // Create service instances
         IPdfService pdfService = new PdfService();
@@ -182,7 +188,8 @@ partial class Program
         qrYInches,
         qrWidthInches,
         qrHeightInches,
-        qrValues
+        qrValues,
+        templateExclusionPatterns
         );
 
         try

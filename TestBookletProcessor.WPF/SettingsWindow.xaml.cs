@@ -80,6 +80,18 @@ namespace TestBookletProcessor.WPF
                     QrRegionHeightTextBox.Text = "2.0";
                     QrExclusionPatternsTextBox.Text = "*-FRTCVR, CLEAN";
                 }
+
+                // Load Template Exclusion Patterns
+                var templateExclusionArray = bp?["TemplateExclusionPatterns"] as JArray;
+                if (templateExclusionArray != null)
+                {
+                    var templatePatterns = templateExclusionArray.Select(t => t.ToString()).ToArray();
+                    TemplateExclusionPatternsTextBox.Text = string.Join(", ", templatePatterns);
+                }
+                else
+                {
+                    TemplateExclusionPatternsTextBox.Text = "*TEMPLATE*, *BLANK*, *SAMPLE*";
+                }
             }
             else
             {
@@ -93,6 +105,7 @@ namespace TestBookletProcessor.WPF
                 QrRegionWidthTextBox.Text = "2.0";
                 QrRegionHeightTextBox.Text = "2.0";
                 QrExclusionPatternsTextBox.Text = "*-FRTCVR, CLEAN";
+                TemplateExclusionPatternsTextBox.Text = "*TEMPLATE*, *BLANK*, *SAMPLE*";
             }
         }
 
@@ -196,6 +209,21 @@ namespace TestBookletProcessor.WPF
             else
             {
                 qrScanner["QrValuesExcludingRedRemoval"] = new JArray();
+            }
+
+            // Parse and save template exclusion patterns
+            var templatePatternsText = TemplateExclusionPatternsTextBox.Text?.Trim() ?? "";
+            if (!string.IsNullOrEmpty(templatePatternsText))
+            {
+                var templatePatterns = templatePatternsText.Split(new[] { ',', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(p => p.Trim())
+                    .Where(p => !string.IsNullOrEmpty(p))
+                    .ToArray();
+                bp["TemplateExclusionPatterns"] = new JArray(templatePatterns);
+            }
+            else
+            {
+                bp["TemplateExclusionPatterns"] = new JArray();
             }
 
             File.WriteAllText(_configPath, _configJson.ToString());

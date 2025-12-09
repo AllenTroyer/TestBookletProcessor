@@ -25,6 +25,7 @@ public class BookletProcessorService
     private readonly int _qrRegionWidth;
     private readonly int _qrRegionHeight;
     private readonly List<string> _qrValuesExcludingRedRemoval;
+    private readonly List<string> _templateExclusionPatterns;
 
     public BookletProcessorService(
         IPdfService pdfService,
@@ -39,7 +40,8 @@ public class BookletProcessorService
         double qrRegionYInches = 9.0,
         double qrRegionWidthInches = 2.0,
         double qrRegionHeightInches = 2.0,
-        List<string>? qrValuesExcludingRedRemoval = null)
+        List<string>? qrValuesExcludingRedRemoval = null,
+        List<string>? templateExclusionPatterns = null)
     {
         _pdfService = pdfService;
         _deskewer = deskewer;
@@ -58,6 +60,9 @@ public class BookletProcessorService
         
         _qrValuesExcludingRedRemoval = qrValuesExcludingRedRemoval ??
                                        new List<string> { "MACHINE_SCORED", "NO_RED_INK", "CLEAN" };
+        
+        _templateExclusionPatterns = templateExclusionPatterns ??
+                                    new List<string> { "*TEMPLATE*", "*BLANK*", "*SAMPLE*" };
     }
 
     public async Task<ProcessingResult> ProcessBookletsWorkflowAsync(
@@ -123,6 +128,16 @@ public class BookletProcessorService
     public async Task ProcessBookletAsync(string templatePdf, string inputPdf, string workingFolder, string outputPdf,
         int dpi)
     {
+        // Check if template should be excluded from QR scanning and red removal
+        var templateFileName = Path.GetFileNameWithoutExtension(templatePdf);
+        var isTemplateExcluded = _templateExclusionPatterns.Any(pattern =>
+            MatchesWildcard(templateFileName, pattern, ignoreCase: true));
+        
+        if (isTemplateExcluded)
+        {
+            Console.WriteLine($"Template '{templateFileName}' matches exclusion pattern - skipping QR scanning and red pixel removal");
+        }
+        
         //1. Split both PDFs
         var templatePages = await _pdfService.SplitPdfAsync(templatePdf, Path.Combine(workingFolder, "template_pages"));
         var inputPages = await _pdfService.SplitPdfAsync(inputPdf, Path.Combine(workingFolder, "input_pages"));
@@ -149,9 +164,9 @@ public class BookletProcessorService
 
             // Scan QR code after deskewing to determine if red pixel removal is needed
             string? qrCodeValue = null;
-            var shouldApplyRedRemoval = _redPixelRemover != null; // Default behavior
+            var shouldApplyRedRemoval = _redPixelRemover != null && !isTemplateExcluded; // Default behavior, skip if template excluded
 
-            if (_enableQrScanning && _qrScanner != null)
+            if (_enableQrScanning && _qrScanner != null && !isTemplateExcluded)
                 try
                 {
                     qrCodeValue = _qrScanner.ScanRegion(deskewedImg, _qrRegionX, _qrRegionY, _qrRegionWidth,

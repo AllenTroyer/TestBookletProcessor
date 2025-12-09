@@ -25,6 +25,8 @@ Title="Settings" Height="650" Width="550">
  <RowDefinition Height="Auto"/>
  <RowDefinition Height="Auto"/>
  <RowDefinition Height="Auto"/>
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="Auto"/>
  </Grid.RowDefinitions>
  <Grid.ColumnDefinitions>
  <ColumnDefinition Width="Auto"/>
@@ -80,6 +82,13 @@ Title="Settings" Height="650" Width="550">
           Margin="0,0,0,10" Height="60" TextWrapping="Wrap" AcceptsReturn="True" 
           VerticalScrollBarVisibility="Auto"
           ToolTip="Enter patterns separated by commas. Supports wildcards (*). Example: *-FRTCVR, CLEAN"/>
+
+ <TextBlock Text="Templates to Exclude from QR Code Scanning and Red Removal:" Grid.Row="14" Grid.Column="0" Grid.ColumnSpan="3" 
+            FontWeight="SemiBold" Margin="0,10,0,5"/>
+ <TextBox x:Name="TemplateExclusionPatternsTextBox" Grid.Row="15" Grid.Column="0" Grid.ColumnSpan="3" 
+          Margin="0,0,0,10" Height="60" TextWrapping="Wrap" AcceptsReturn="True" 
+          VerticalScrollBarVisibility="Auto"
+          ToolTip="Enter template name patterns separated by commas. Supports wildcards (*). Example: *TEMPLATE*, *BLANK*, *SAMPLE*&#x0a;Templates matching these patterns will skip both QR scanning and red pixel removal."/>
  </Grid>
  </ScrollViewer>
  
