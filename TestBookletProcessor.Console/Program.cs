@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using QrRegionScanner;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using TestBookletProcessor.Core.Interfaces;
@@ -37,6 +38,7 @@ partial class Program
     static async Task TestQrCodeScanner()
     {
         Console.WriteLine("\n=== QR Code Scanner Test ===");
+        var stopwatch = Stopwatch.StartNew();
 
         // Path to test image
         string testImagePath = @"C:\TestBooklets\Input\test_page.png";
@@ -104,6 +106,8 @@ partial class Program
             Console.WriteLine($"Stack trace: {ex.StackTrace}");
         }
 
+        stopwatch.Stop();
+        Console.WriteLine($"\nTime elapsed: {stopwatch.Elapsed.TotalSeconds:F2} seconds ({stopwatch.Elapsed:mm\\:ss\\.fff})");
         Console.WriteLine("\nTest completed. Press any key to exit.");
         Console.ReadKey();
     }
@@ -111,6 +115,7 @@ partial class Program
     static async Task TestBookletProcessing()
     {
         Console.WriteLine("\n=== Booklet Processing Test ===");
+        var stopwatch = Stopwatch.StartNew();
 
         // Load configuration from appsettings.json
         var config = new ConfigurationBuilder()
@@ -119,7 +124,7 @@ partial class Program
             .Build();
 
         // Paths for testing
-        string templatePdf = @"C:\TestBooklets\Templates\template.pdf";
+        string templatePdf = @"C:\TestBooklets\Templates\Template_CAT1B.pdf";
         string inputPdf = @"C:\TestBooklets\Input\input.pdf";
         string workingFolder = @"C:\TestBooklets\Output";
         string outputPdf = @"C:\TestBooklets\Output\final_output.pdf";
@@ -141,20 +146,20 @@ partial class Program
         // Load QR scanner configuration
         var enableQrStr = config?["BookletProcessor:QrScanner:EnableQrScanning"];
         bool enableQrScanning = enableQrStr != null && enableQrStr.Equals("true", StringComparison.OrdinalIgnoreCase);
-        
+
         double qrXInches = double.TryParse(config?["BookletProcessor:QrScanner:QrRegionXInches"], out var xi) ? xi : 6.5;
         double qrYInches = double.TryParse(config?["BookletProcessor:QrScanner:QrRegionYInches"], out var yi) ? yi : 9.0;
         double qrWidthInches = double.TryParse(config?["BookletProcessor:QrScanner:QrRegionWidthInches"], out var wi) ? wi : 2.0;
         double qrHeightInches = double.TryParse(config?["BookletProcessor:QrScanner:QrRegionHeightInches"], out var hi) ? hi : 2.0;
-        
+
         var qrValuesSection = config?.GetSection("BookletProcessor:QrScanner:QrValuesExcludingRedRemoval");
         var qrValues = qrValuesSection?.GetChildren().Select(c => c.Value ?? "").ToList() ??
                       new List<string> { "MACHINE_SCORED", "NO_RED_INK", "CLEAN" };
-        
+
         // Load Template Exclusion Patterns
         var templateExclusionSection = config?.GetSection("BookletProcessor:TemplateExclusionPatterns");
         var templateExclusionPatterns = templateExclusionSection?.GetChildren().Select(c => c.Value ?? "").ToList() ??
-                      new List<string> { "*TEMPLATE*", "*BLANK*", "*SAMPLE*" };
+                      new List<string> { "*BLANK*", "*SAMPLE*" };
 
         Console.WriteLine($"Red pixel remover enabled: {enableRedPixelRemover}");
         Console.WriteLine($"Red pixel threshold: {redPixelThreshold}");
@@ -202,6 +207,8 @@ partial class Program
             Console.WriteLine($"Test failed: {ex.Message}");
         }
 
+        stopwatch.Stop();
+        Console.WriteLine($"\nTime elapsed: {stopwatch.Elapsed.TotalSeconds:F2} seconds ({stopwatch.Elapsed:mm\\:ss\\.fff})");
         Console.WriteLine("\nPress any key to exit.");
         Console.ReadKey();
     }
