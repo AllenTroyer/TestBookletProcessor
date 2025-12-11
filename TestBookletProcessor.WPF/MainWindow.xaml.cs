@@ -116,6 +116,28 @@ namespace TestBookletProcessor.WPF
                 }
             }
             
+            // Load Secondary QR Scan Configuration
+            SecondaryQrScanConfig? secondaryQrScanConfig = null;
+            var secondaryQrSection = _config?.GetSection("BookletProcessor:ScannedSheets:SecondaryQrScan");
+            if (secondaryQrSection != null && secondaryQrSection.Exists())
+            {
+                secondaryQrScanConfig = new SecondaryQrScanConfig
+                {
+                    TriggerQrCode = secondaryQrSection["TriggerQrCode"] ?? "CHECKLISTQR-01",
+                    RegionXInches = double.TryParse(secondaryQrSection["RegionXInches"], out var sx) ? sx : 0.0,
+                    RegionYInches = double.TryParse(secondaryQrSection["RegionYInches"], out var sy) ? sy : 0.75,
+                    RegionWidthInches = double.TryParse(secondaryQrSection["RegionWidthInches"], out var sw) ? sw : 2.0,
+                    RegionHeightInches = double.TryParse(secondaryQrSection["RegionHeightInches"], out var sh) ? sh : 1.0,
+                    FileNameReplacementPattern = secondaryQrSection["FileNameReplacementPattern"] ?? "SchoolCityState"
+                };
+                
+                Console.WriteLine($"Secondary QR scan configured:");
+                Console.WriteLine($"  Trigger QR: {secondaryQrScanConfig.TriggerQrCode}");
+                Console.WriteLine($"  Region: ({secondaryQrScanConfig.RegionXInches}\", {secondaryQrScanConfig.RegionYInches}\") " +
+                                  $"{secondaryQrScanConfig.RegionWidthInches}\" × {secondaryQrScanConfig.RegionHeightInches}\"");
+                Console.WriteLine($"  Replacement pattern: {secondaryQrScanConfig.FileNameReplacementPattern}");
+            }
+            
             // Create scanned sheet processor
             IScannedSheetProcessor? scannedSheetProcessor = null;
             if (!string.IsNullOrEmpty(scannedSheetTemplateName))
@@ -134,7 +156,8 @@ namespace TestBookletProcessor.WPF
                     qrHeightInches,
                     dpi,
                     qrValues,
-                    redPixelExclusionRegions);
+                    redPixelExclusionRegions,
+                    secondaryQrScanConfig);
             }
 
             _bookletProcessor = new BookletProcessorService(
@@ -421,6 +444,22 @@ namespace TestBookletProcessor.WPF
                     }
                 }
                 
+                // Load Secondary QR Scan Configuration
+                SecondaryQrScanConfig? secondaryQrScanConfig = null;
+                var secondaryQrSection = _config?.GetSection("BookletProcessor:ScannedSheets:SecondaryQrScan");
+                if (secondaryQrSection != null && secondaryQrSection.Exists())
+                {
+                    secondaryQrScanConfig = new SecondaryQrScanConfig
+                    {
+                        TriggerQrCode = secondaryQrSection["TriggerQrCode"] ?? "CHECKLISTQR-01",
+                        RegionXInches = double.TryParse(secondaryQrSection["RegionXInches"], out var sx) ? sx : 0.0,
+                        RegionYInches = double.TryParse(secondaryQrSection["RegionYInches"], out var sy) ? sy : 0.75,
+                        RegionWidthInches = double.TryParse(secondaryQrSection["RegionWidthInches"], out var sw) ? sw : 2.0,
+                        RegionHeightInches = double.TryParse(secondaryQrSection["RegionHeightInches"], out var sh) ? sh : 1.0,
+                        FileNameReplacementPattern = secondaryQrSection["FileNameReplacementPattern"] ?? "SchoolCityState"
+                    };
+                }
+                
                 // Create scanned sheet processor
                 IScannedSheetProcessor? scannedSheetProcessor = null;
                 if (!string.IsNullOrEmpty(scannedSheetTemplateName))
@@ -439,7 +478,8 @@ namespace TestBookletProcessor.WPF
                         qrHeightInches,
                         dpi,
                         qrValues,
-                        redPixelExclusionRegions);
+                        redPixelExclusionRegions,
+                        secondaryQrScanConfig);
                 }
 
                 // Recreate the booklet processor with new settings

@@ -29,6 +29,7 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
     private readonly int _qrRegionHeight;
     private readonly List<string> _qrValuesExcludingRedRemoval;
     private readonly List<RedPixelExclusionRegion> _redPixelExclusionRegions;
+    private readonly SecondaryQrScanConfig? _secondaryQrScanConfig;
 
     public ScannedSheetProcessorService(
         IPdfService pdfService,
@@ -44,7 +45,8 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
         double qrRegionHeightInches = 2.0,
         int dpi = 300,
         List<string>? qrValuesExcludingRedRemoval = null,
-        List<RedPixelExclusionRegion>? redPixelExclusionRegions = null)
+        List<RedPixelExclusionRegion>? redPixelExclusionRegions = null,
+        SecondaryQrScanConfig? secondaryQrScanConfig = null)
     {
         _pdfService = pdfService;
         _deskewer = deskewer;
@@ -64,6 +66,7 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
                                        new List<string> { "MACHINE_SCORED", "NO_RED_INK", "CLEAN" };
         
         _redPixelExclusionRegions = redPixelExclusionRegions ?? new List<RedPixelExclusionRegion>();
+        _secondaryQrScanConfig = secondaryQrScanConfig;
     }
 
     public async Task<ProcessingResult> ProcessScannedSheetsAsync(
@@ -102,6 +105,9 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
             Console.WriteLine($"Template has {templatePages.Count} pages");
 
             var processedPages = new List<string>();
+            
+            // Track secondary QR value for file naming
+            string? secondaryQrValue = null;
 
             // Process each page individually
             for (int i = 0; i < inputPages.Count; i++)
@@ -111,7 +117,7 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
                 progressCallback?.Invoke(pageNum, totalPages);
 
                 var inputPage = inputPages[i];
-                var processedPage = await ProcessSinglePageAsync(
+                var (processedPage, scannedSecondaryQr) = await ProcessSinglePageAsync(
                     inputPage,
                     templatePages,
                     qrMapping,
@@ -120,20 +126,44 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
                     dpi);
 
                 processedPages.Add(processedPage);
+                
+                // Store first found secondary QR value for file naming
+                if (scannedSecondaryQr != null && secondaryQrValue == null)
+                {
+                    secondaryQrValue = scannedSecondaryQr;
+                    Console.WriteLine($"  ? Secondary QR captured for file naming: {secondaryQrValue}");
+                }
             }
 
             // Merge all processed pages
             Console.WriteLine($"\nMerging {processedPages.Count} processed pages...");
             await _pdfService.MergePdfsAsync(processedPages, outputPdf);
+            
+            // Apply dynamic file naming if secondary QR was found
+            string finalOutputPath = outputPdf;
+            if (secondaryQrValue != null && _secondaryQrScanConfig != null)
+            {
+                finalOutputPath = ApplyDynamicFileName(
+                    outputPdf, 
+                    secondaryQrValue, 
+                    _secondaryQrScanConfig.FileNameReplacementPattern);
+                
+                // Rename file if path changed
+                if (finalOutputPath != outputPdf && File.Exists(outputPdf))
+                {
+                    File.Move(outputPdf, finalOutputPath);
+                    Console.WriteLine($"  ? File renamed to: {Path.GetFileName(finalOutputPath)}");
+                }
+            }
 
             result.Success = true;
-            result.OutputPath = outputPdf;
+            result.OutputPath = finalOutputPath;
             result.PagesProcessed = processedPages.Count;
             stopwatch.Stop();
             result.ProcessingTime = stopwatch.Elapsed;
 
             Console.WriteLine($"\n? Processing complete!");
-            Console.WriteLine($"  Output: {outputPdf}");
+            Console.WriteLine($"  Output: {finalOutputPath}");
             Console.WriteLine($"  Pages: {result.PagesProcessed}");
             Console.WriteLine($"  Time: {result.ProcessingTime.TotalSeconds:F2}s");
 
@@ -152,7 +182,7 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
         return result;
     }
 
-    private async Task<string> ProcessSinglePageAsync(
+    private async Task<(string processedPagePdf, string? secondaryQrValue)> ProcessSinglePageAsync(
         string inputPagePdf,
         List<string> templatePages,
         Dictionary<string, int> qrMapping,
@@ -173,6 +203,7 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
 
         // Try to scan QR code
         string? qrCode = null;
+        string? secondaryQrValue = null;
         int? templatePageIndex = null;
 
         if (_enableQrScanning && _qrScanner != null)
@@ -194,6 +225,23 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
                     {
                         Console.WriteLine($"  ? QR code not mapped - page will remain unchanged");
                     }
+                    
+                    // Check if this QR triggers secondary scan for file naming
+                    if (_secondaryQrScanConfig != null && 
+                        qrCode.Equals(_secondaryQrScanConfig.TriggerQrCode, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Console.WriteLine($"  ? Trigger QR detected, scanning secondary region...");
+                        secondaryQrValue = await ScanSecondaryQrRegion(deskewedImage, dpi);
+                        
+                        if (secondaryQrValue != null)
+                        {
+                            Console.WriteLine($"  ? Secondary QR found: {secondaryQrValue}");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"  ? No secondary QR found in region");
+                        }
+                    }
                 }
                 else
                 {
@@ -211,7 +259,7 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
         {
             var unchangedPdf = Path.Combine(pageFolder, "output.pdf");
             await _pdfService.ConvertImageToPdfAsync(deskewedImage, unchangedPdf);
-            return unchangedPdf;
+            return (unchangedPdf, secondaryQrValue);
         }
 
         // Get the corresponding template page
@@ -261,7 +309,7 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
         var outputPdf = Path.Combine(pageFolder, "output.pdf");
         await _pdfService.ConvertImageToPdfAsync(alignedImage, outputPdf);
 
-        return outputPdf;
+        return (outputPdf, secondaryQrValue);
     }
 
     private int? FindTemplatePageForQr(string qrCode, Dictionary<string, int> mapping)
@@ -294,4 +342,117 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
 
         return System.Text.RegularExpressions.Regex.IsMatch(value, regexPattern, options);
     }
+
+    /// <summary>
+    /// Scans a secondary QR code region on the page for file naming purposes.
+    /// </summary>
+    private async Task<string?> ScanSecondaryQrRegion(string imagePath, int dpi)
+    {
+        if (_qrScanner == null || _secondaryQrScanConfig == null)
+            return null;
+
+        try
+        {
+            var (x, y, width, height) = _secondaryQrScanConfig.ToPixelCoordinates(dpi);
+            
+            // Scan the secondary region
+            var qrValue = await Task.Run(() => 
+                _qrScanner.ScanRegion(imagePath, x, y, width, height));
+            
+            return qrValue;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ? Secondary QR scan error: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Applies dynamic file naming by extracting the portion before the colon from the QR value
+    /// and replacing the pattern in the filename.
+    /// </summary>
+    private string ApplyDynamicFileName(
+        string originalPath, 
+        string secondaryQrValue, 
+        string replacementPattern)
+    {
+        // Extract portion before colon (colon is always present per requirements)
+        var colonIndex = secondaryQrValue.IndexOf(':');
+        string extractedValue;
+        
+        if (colonIndex >= 0)
+        {
+            extractedValue = secondaryQrValue.Substring(0, colonIndex).Trim();
+        }
+        else
+        {
+            // Fallback if no colon found (shouldn't happen per requirements)
+            extractedValue = secondaryQrValue.Trim();
+        }
+        
+        // Sanitize for filename use
+        extractedValue = SanitizeFileName(extractedValue);
+        
+        if (string.IsNullOrEmpty(extractedValue))
+        {
+            Console.WriteLine($"  ? Extracted value is empty, using original filename");
+            return originalPath;
+        }
+        
+        // Get directory and filename
+        var directory = Path.GetDirectoryName(originalPath) ?? "";
+        var fileName = Path.GetFileName(originalPath);
+        
+        // Replace pattern in filename (case-insensitive, at start of filename)
+        string newFileName;
+        if (fileName.StartsWith(replacementPattern, StringComparison.OrdinalIgnoreCase))
+        {
+            // Pattern is at the start - replace it
+            newFileName = extractedValue + fileName.Substring(replacementPattern.Length);
+        }
+        else
+        {
+            // Pattern not found - prepend extracted value
+            var fileNameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
+            var extension = Path.GetExtension(fileName);
+            newFileName = $"{extractedValue}_{fileNameWithoutExt}{extension}";
+        }
+        
+        var newPath = Path.Combine(directory, newFileName);
+        
+        Console.WriteLine($"\n  ? File Naming:");
+        Console.WriteLine($"    Original: {fileName}");
+        Console.WriteLine($"    New: {newFileName}");
+        Console.WriteLine($"    Extracted: '{extractedValue}' from '{secondaryQrValue}'");
+        
+        return newPath;
+    }
+
+    /// <summary>
+    /// Sanitizes a string for use in a filename by removing invalid characters
+    /// and limiting length.
+    /// </summary>
+    private string SanitizeFileName(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+            return "";
+
+        // Remove invalid filename characters
+        var invalidChars = Path.GetInvalidFileNameChars();
+        var sanitized = string.Concat(fileName.Split(invalidChars));
+        
+        // Replace spaces with underscores
+        sanitized = sanitized.Replace(' ', '_');
+        
+        // Remove any remaining problematic characters
+        sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"[^\w\-_]", "");
+        
+        // Limit length to 50 characters
+        if (sanitized.Length > 50)
+            sanitized = sanitized.Substring(0, 50);
+        
+        return sanitized;
+    }
 }
+

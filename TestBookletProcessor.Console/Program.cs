@@ -127,7 +127,7 @@ partial class Program
         // To test Scanned Sheet Mode: use Template_ScannedSheets.pdf
         // To test Booklet Mode: use any other template (e.g., Template_CAT1B.pdf)
         string templatePdf = @"C:\TestBooklets\Templates\Template_ScannedSheets.pdf";
-        string inputPdf = @"C:\TestBooklets\Input\input.pdf";
+        string inputPdf = @"C:\TestBooklets\Input\SchoolCityState 2025-12-11_0622.pdf";
         string outputFolder = @"C:\TestBooklets\Output";
 
         // Ensure output folder exists
@@ -200,7 +200,7 @@ partial class Program
         IImageAligner aligner = new ImageAlignerAlt();
         IRedPixelRemoverService redPixelRemover = new RedPixelRemoverService();
         RegionQrScanner qrScanner = new RegionQrScanner();
-        
+
         // Load Red Pixel Exclusion Regions
         var exclusionRegionsSection = config?.GetSection("BookletProcessor:RedPixelExclusionRegions");
         var redPixelExclusionRegions = new List<RedPixelExclusionRegion>();
@@ -216,7 +216,7 @@ partial class Program
                     WidthInches = double.TryParse(child["WidthInches"], out var w) ? w : 0,
                     HeightInches = double.TryParse(child["HeightInches"], out var h) ? h : 0
                 };
-                
+
                 var patternsSection = child.GetSection("QrCodePatterns");
                 if (patternsSection != null)
                 {
@@ -225,14 +225,14 @@ partial class Program
                         .Where(v => !string.IsNullOrEmpty(v))
                         .ToList();
                 }
-                
+
                 if (region.QrCodePatterns.Any())
                 {
                     redPixelExclusionRegions.Add(region);
                 }
             }
         }
-        
+
         if (redPixelExclusionRegions.Any())
         {
             Console.WriteLine($"Red pixel exclusion regions: {redPixelExclusionRegions.Count} region(s)");
@@ -240,6 +240,28 @@ partial class Program
             {
                 Console.WriteLine($"  - {region.Name}: QR patterns: {string.Join(", ", region.QrCodePatterns)}");
             }
+        }
+
+        // Load Secondary QR Scan Configuration
+        SecondaryQrScanConfig? secondaryQrScanConfig = null;
+        var secondaryQrSection = config?.GetSection("BookletProcessor:ScannedSheets:SecondaryQrScan");
+        if (secondaryQrSection != null && secondaryQrSection.Exists())
+        {
+            secondaryQrScanConfig = new SecondaryQrScanConfig
+            {
+                TriggerQrCode = secondaryQrSection["TriggerQrCode"] ?? "CHECKLISTQR-01",
+                RegionXInches = double.TryParse(secondaryQrSection["RegionXInches"], out var sx) ? sx : 0.0,
+                RegionYInches = double.TryParse(secondaryQrSection["RegionYInches"], out var sy) ? sy : 0.75,
+                RegionWidthInches = double.TryParse(secondaryQrSection["RegionWidthInches"], out var sw) ? sw : 2.0,
+                RegionHeightInches = double.TryParse(secondaryQrSection["RegionHeightInches"], out var sh) ? sh : 1.0,
+                FileNameReplacementPattern = secondaryQrSection["FileNameReplacementPattern"] ?? "SchoolCityState"
+            };
+
+            Console.WriteLine($"Secondary QR scan configured:");
+            Console.WriteLine($"  Trigger QR: {secondaryQrScanConfig.TriggerQrCode}");
+            Console.WriteLine($"  Region: ({secondaryQrScanConfig.RegionXInches}\", {secondaryQrScanConfig.RegionYInches}\") " +
+                              $"{secondaryQrScanConfig.RegionWidthInches}\" × {secondaryQrScanConfig.RegionHeightInches}\"");
+            Console.WriteLine($"  Replacement pattern: {secondaryQrScanConfig.FileNameReplacementPattern}");
         }
 
         // Create scanned sheet processor if configured
@@ -260,7 +282,8 @@ partial class Program
                 qrHeightInches,
                 dpi,
                 qrValues,
-                redPixelExclusionRegions);
+                redPixelExclusionRegions,
+                secondaryQrScanConfig);
         }
 
         var bookletProcessor = new BookletProcessorService(
@@ -287,11 +310,11 @@ partial class Program
         {
             // Use ProcessBookletsWorkflowAsync which includes auto-detection for scanned sheet mode
             var result = await bookletProcessor.ProcessBookletsWorkflowAsync(
-                inputPdf, 
-                templatePdf, 
-                outputFolder, 
+                inputPdf,
+                templatePdf,
+                outputFolder,
                 null); // No progress callback for console
-            
+
             if (result.Success)
             {
                 Console.WriteLine("Test completed successfully.");
