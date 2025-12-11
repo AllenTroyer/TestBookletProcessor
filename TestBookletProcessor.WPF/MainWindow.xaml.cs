@@ -75,6 +75,47 @@ namespace TestBookletProcessor.WPF
                 }
             }
             
+            // Load Red Pixel Exclusion Regions
+            var exclusionRegionsSection = _config?.GetSection("BookletProcessor:RedPixelExclusionRegions");
+            var redPixelExclusionRegions = new List<RedPixelExclusionRegion>();
+            if (exclusionRegionsSection != null)
+            {
+                foreach (var child in exclusionRegionsSection.GetChildren())
+                {
+                    var region = new RedPixelExclusionRegion
+                    {
+                        Name = child["Name"] ?? "",
+                        XInches = double.TryParse(child["XInches"], out var x) ? x : 0,
+                        YInches = double.TryParse(child["YInches"], out var y) ? y : 0,
+                        WidthInches = double.TryParse(child["WidthInches"], out var w) ? w : 0,
+                        HeightInches = double.TryParse(child["HeightInches"], out var h) ? h : 0
+                    };
+                    
+                    var patternsSection = child.GetSection("QrCodePatterns");
+                    if (patternsSection != null)
+                    {
+                        region.QrCodePatterns = patternsSection.GetChildren()
+                            .Select(c => c.Value ?? "")
+                            .Where(v => !string.IsNullOrEmpty(v))
+                            .ToList();
+                    }
+                    
+                    if (region.QrCodePatterns.Any())
+                    {
+                        redPixelExclusionRegions.Add(region);
+                    }
+                }
+            }
+            
+            if (redPixelExclusionRegions.Any())
+            {
+                Console.WriteLine($"Loaded {redPixelExclusionRegions.Count} red pixel exclusion region(s)");
+                foreach (var region in redPixelExclusionRegions)
+                {
+                    Console.WriteLine($"  - {region.Name}: QR patterns: {string.Join(", ", region.QrCodePatterns)}");
+                }
+            }
+            
             // Create scanned sheet processor
             IScannedSheetProcessor? scannedSheetProcessor = null;
             if (!string.IsNullOrEmpty(scannedSheetTemplateName))
@@ -92,7 +133,8 @@ namespace TestBookletProcessor.WPF
                     qrWidthInches,
                     qrHeightInches,
                     dpi,
-                    qrValues);
+                    qrValues,
+                    redPixelExclusionRegions);
             }
 
             _bookletProcessor = new BookletProcessorService(
@@ -347,6 +389,38 @@ namespace TestBookletProcessor.WPF
                     }
                 }
                 
+                // Load Red Pixel Exclusion Regions
+                var exclusionRegionsSection = _config?.GetSection("BookletProcessor:RedPixelExclusionRegions");
+                var redPixelExclusionRegions = new List<RedPixelExclusionRegion>();
+                if (exclusionRegionsSection != null)
+                {
+                    foreach (var child in exclusionRegionsSection.GetChildren())
+                    {
+                        var region = new RedPixelExclusionRegion
+                        {
+                            Name = child["Name"] ?? "",
+                            XInches = double.TryParse(child["XInches"], out var x) ? x : 0,
+                            YInches = double.TryParse(child["YInches"], out var y) ? y : 0,
+                            WidthInches = double.TryParse(child["WidthInches"], out var w) ? w : 0,
+                            HeightInches = double.TryParse(child["HeightInches"], out var h) ? h : 0
+                        };
+                        
+                        var patternsSection = child.GetSection("QrCodePatterns");
+                        if (patternsSection != null)
+                        {
+                            region.QrCodePatterns = patternsSection.GetChildren()
+                                .Select(c => c.Value ?? "")
+                                .Where(v => !string.IsNullOrEmpty(v))
+                                .ToList();
+                        }
+                        
+                        if (region.QrCodePatterns.Any())
+                        {
+                            redPixelExclusionRegions.Add(region);
+                        }
+                    }
+                }
+                
                 // Create scanned sheet processor
                 IScannedSheetProcessor? scannedSheetProcessor = null;
                 if (!string.IsNullOrEmpty(scannedSheetTemplateName))
@@ -364,7 +438,8 @@ namespace TestBookletProcessor.WPF
                         qrWidthInches,
                         qrHeightInches,
                         dpi,
-                        qrValues);
+                        qrValues,
+                        redPixelExclusionRegions);
                 }
 
                 // Recreate the booklet processor with new settings

@@ -200,6 +200,47 @@ partial class Program
         IImageAligner aligner = new ImageAlignerAlt();
         IRedPixelRemoverService redPixelRemover = new RedPixelRemoverService();
         RegionQrScanner qrScanner = new RegionQrScanner();
+        
+        // Load Red Pixel Exclusion Regions
+        var exclusionRegionsSection = config?.GetSection("BookletProcessor:RedPixelExclusionRegions");
+        var redPixelExclusionRegions = new List<RedPixelExclusionRegion>();
+        if (exclusionRegionsSection != null)
+        {
+            foreach (var child in exclusionRegionsSection.GetChildren())
+            {
+                var region = new RedPixelExclusionRegion
+                {
+                    Name = child["Name"] ?? "",
+                    XInches = double.TryParse(child["XInches"], out var x) ? x : 0,
+                    YInches = double.TryParse(child["YInches"], out var y) ? y : 0,
+                    WidthInches = double.TryParse(child["WidthInches"], out var w) ? w : 0,
+                    HeightInches = double.TryParse(child["HeightInches"], out var h) ? h : 0
+                };
+                
+                var patternsSection = child.GetSection("QrCodePatterns");
+                if (patternsSection != null)
+                {
+                    region.QrCodePatterns = patternsSection.GetChildren()
+                        .Select(c => c.Value ?? "")
+                        .Where(v => !string.IsNullOrEmpty(v))
+                        .ToList();
+                }
+                
+                if (region.QrCodePatterns.Any())
+                {
+                    redPixelExclusionRegions.Add(region);
+                }
+            }
+        }
+        
+        if (redPixelExclusionRegions.Any())
+        {
+            Console.WriteLine($"Red pixel exclusion regions: {redPixelExclusionRegions.Count} region(s)");
+            foreach (var region in redPixelExclusionRegions)
+            {
+                Console.WriteLine($"  - {region.Name}: QR patterns: {string.Join(", ", region.QrCodePatterns)}");
+            }
+        }
 
         // Create scanned sheet processor if configured
         IScannedSheetProcessor? scannedSheetProcessor = null;
@@ -218,7 +259,8 @@ partial class Program
                 qrWidthInches,
                 qrHeightInches,
                 dpi,
-                qrValues);
+                qrValues,
+                redPixelExclusionRegions);
         }
 
         var bookletProcessor = new BookletProcessorService(

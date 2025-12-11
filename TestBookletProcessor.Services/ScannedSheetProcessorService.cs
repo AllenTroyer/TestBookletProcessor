@@ -28,6 +28,7 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
     private readonly int _qrRegionWidth;
     private readonly int _qrRegionHeight;
     private readonly List<string> _qrValuesExcludingRedRemoval;
+    private readonly List<RedPixelExclusionRegion> _redPixelExclusionRegions;
 
     public ScannedSheetProcessorService(
         IPdfService pdfService,
@@ -42,7 +43,8 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
         double qrRegionWidthInches = 2.0,
         double qrRegionHeightInches = 2.0,
         int dpi = 300,
-        List<string>? qrValuesExcludingRedRemoval = null)
+        List<string>? qrValuesExcludingRedRemoval = null,
+        List<RedPixelExclusionRegion>? redPixelExclusionRegions = null)
     {
         _pdfService = pdfService;
         _deskewer = deskewer;
@@ -60,6 +62,8 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
         
         _qrValuesExcludingRedRemoval = qrValuesExcludingRedRemoval ??
                                        new List<string> { "MACHINE_SCORED", "NO_RED_INK", "CLEAN" };
+        
+        _redPixelExclusionRegions = redPixelExclusionRegions ?? new List<RedPixelExclusionRegion>();
     }
 
     public async Task<ProcessingResult> ProcessScannedSheetsAsync(
@@ -224,8 +228,27 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
         if (shouldApplyRedRemoval)
         {
             Console.WriteLine($"  ? Applying red pixel removal");
+            
+            // Filter exclusion regions that apply to this QR code
+            var applicableRegions = new List<RedPixelExclusionRegion>();
+            if (qrCode != null)
+            {
+                applicableRegions = _redPixelExclusionRegions
+                    .Where(r => r.AppliesTo(qrCode))
+                    .ToList();
+                
+                if (applicableRegions.Any())
+                {
+                    Console.WriteLine($"  ? Applying {applicableRegions.Count} exclusion region(s) for QR: {qrCode}");
+                    foreach (var region in applicableRegions)
+                    {
+                        Console.WriteLine($"    - {region.Name}: ({region.XInches}\", {region.YInches}\") {region.WidthInches}\" × {region.HeightInches}\"");
+                    }
+                }
+            }
+            
             var redRemovedImage = Path.Combine(pageFolder, "red_removed.png");
-            await _redPixelRemover!.RemoveRedPixelsAsync(deskewedImage, redRemovedImage, _redThreshold, dpi);
+            await _redPixelRemover!.RemoveRedPixelsAsync(deskewedImage, redRemovedImage, _redThreshold, dpi, applicableRegions);
             imageToAlign = redRemovedImage;
         }
 
