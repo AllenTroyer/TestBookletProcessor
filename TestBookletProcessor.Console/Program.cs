@@ -127,7 +127,7 @@ partial class Program
         // To test Scanned Sheet Mode: use Template_ScannedSheets.pdf
         // To test Booklet Mode: use any other template (e.g., Template_CAT1B.pdf)
         string templatePdf = @"C:\TestBooklets\Templates\Template_ScannedSheets.pdf";
-        string inputPdf = @"C:\TestBooklets\Input\SchoolCityState 2025-12-11_0622.pdf";
+        string inputPdf = @"C:\Users\allen\Dropbox\Data\Catforms\Scans\TestScans\345 sheets\Sig 2025-12-12_0633.pdf";
         string outputFolder = @"C:\TestBooklets\Output";
 
         // Ensure output folder exists
