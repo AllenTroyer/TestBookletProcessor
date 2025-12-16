@@ -37,6 +37,16 @@ public class SecondaryQrScanConfig
     /// The extracted value (portion before colon) will replace this pattern.
     /// </summary>
     public string FileNameReplacementPattern { get; set; } = "SchoolCityState";
+    
+    /// <summary>
+    /// Gets or sets whether to rename and move the input file to the archive folder.
+    /// </summary>
+    public bool RenameInputFiles { get; set; } = true;
+    
+    /// <summary>
+    /// Gets or sets the folder path where renamed input files will be moved.
+    /// </summary>
+    public string ArchiveFolder { get; set; } = @"C:\Users\allen\Dropbox\Data\Catforms\Scans\TestScans\ToArchive";
 
     /// <summary>
     /// Converts the inch-based region dimensions to pixel coordinates based on DPI.

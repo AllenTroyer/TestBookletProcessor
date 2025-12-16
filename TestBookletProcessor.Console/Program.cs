@@ -254,7 +254,9 @@ partial class Program
                 RegionYInches = double.TryParse(secondaryQrSection["RegionYInches"], out var sy) ? sy : 0.75,
                 RegionWidthInches = double.TryParse(secondaryQrSection["RegionWidthInches"], out var sw) ? sw : 2.0,
                 RegionHeightInches = double.TryParse(secondaryQrSection["RegionHeightInches"], out var sh) ? sh : 1.0,
-                FileNameReplacementPattern = secondaryQrSection["FileNameReplacementPattern"] ?? "SchoolCityState"
+                FileNameReplacementPattern = secondaryQrSection["FileNameReplacementPattern"] ?? "SchoolCityState",
+                RenameInputFiles = secondaryQrSection["RenameInputFiles"]?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? true,
+                ArchiveFolder = secondaryQrSection["ArchiveFolder"] ?? @"C:\Users\allen\Dropbox\Data\Catforms\Scans\TestScans\ToArchive"
             };
 
             Console.WriteLine($"Secondary QR scan configured:");
@@ -262,6 +264,11 @@ partial class Program
             Console.WriteLine($"  Region: ({secondaryQrScanConfig.RegionXInches}\", {secondaryQrScanConfig.RegionYInches}\") " +
                               $"{secondaryQrScanConfig.RegionWidthInches}\" × {secondaryQrScanConfig.RegionHeightInches}\"");
             Console.WriteLine($"  Replacement pattern: {secondaryQrScanConfig.FileNameReplacementPattern}");
+            Console.WriteLine($"  Rename input files: {secondaryQrScanConfig.RenameInputFiles}");
+            if (secondaryQrScanConfig.RenameInputFiles)
+            {
+                Console.WriteLine($"  Archive folder: {secondaryQrScanConfig.ArchiveFolder}");
+            }
         }
 
         // Create scanned sheet processor if configured

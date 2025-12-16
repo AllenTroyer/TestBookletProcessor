@@ -143,8 +143,11 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
             
             // Apply dynamic file naming if secondary QR was found
             string finalOutputPath = outputPdf;
+            string? renamedInputPath = null;
+            
             if (secondaryQrValue != null && _secondaryQrScanConfig != null)
             {
+                // Rename output file
                 finalOutputPath = ApplyDynamicFileName(
                     outputPdf, 
                     secondaryQrValue, 
@@ -154,7 +157,50 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
                 if (finalOutputPath != outputPdf && File.Exists(outputPdf))
                 {
                     File.Move(outputPdf, finalOutputPath);
-                    Console.WriteLine($"  ? File renamed to: {Path.GetFileName(finalOutputPath)}");
+                    Console.WriteLine($"  ? Output file renamed to: {Path.GetFileName(finalOutputPath)}");
+                }
+                
+                // Rename and move input file if configured
+                if (_secondaryQrScanConfig.RenameInputFiles && File.Exists(inputPdf))
+                {
+                    try
+                    {
+                        // Ensure archive folder exists
+                        Directory.CreateDirectory(_secondaryQrScanConfig.ArchiveFolder);
+                        
+                        // Calculate new input filename
+                        var inputFileName = Path.GetFileName(inputPdf);
+                        var newInputFileName = ApplyDynamicFileNameToPath(
+                            inputFileName,
+                            secondaryQrValue,
+                            _secondaryQrScanConfig.FileNameReplacementPattern);
+                        
+                        // Construct full archive path
+                        renamedInputPath = Path.Combine(_secondaryQrScanConfig.ArchiveFolder, newInputFileName);
+                        
+                        // Handle file conflicts
+                        if (File.Exists(renamedInputPath))
+                        {
+                            var timestamp = DateTime.Now.ToString("yyyyMMddHHmmss");
+                            var fileNameWithoutExt = Path.GetFileNameWithoutExtension(renamedInputPath);
+                            var extension = Path.GetExtension(renamedInputPath);
+                            renamedInputPath = Path.Combine(
+                                _secondaryQrScanConfig.ArchiveFolder,
+                                $"{fileNameWithoutExt}_{timestamp}{extension}");
+                        }
+                        
+                        // Move and rename input file
+                        File.Move(inputPdf, renamedInputPath);
+                        Console.WriteLine($"\n  ? Input Archive:");
+                        Console.WriteLine($"    Original: {Path.GetFileName(inputPdf)}");
+                        Console.WriteLine($"    Archived as: {Path.GetFileName(renamedInputPath)}");
+                        Console.WriteLine($"    Location: {_secondaryQrScanConfig.ArchiveFolder}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"\n  ? Failed to rename/move input file: {ex.Message}");
+                        Console.WriteLine($"    Input file remains at: {inputPdf}");
+                    }
                 }
             }
 
@@ -433,6 +479,54 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
         Console.WriteLine($"    Extracted: '{extractedValue}' from '{secondaryQrValue}'");
         
         return newPath;
+    }
+    
+    /// <summary>
+    /// Applies dynamic file naming to a filename (without directory path).
+    /// Used for renaming input files that will be moved to archive folder.
+    /// </summary>
+    private string ApplyDynamicFileNameToPath(
+        string fileName,
+        string secondaryQrValue,
+        string replacementPattern)
+    {
+        // Extract portion before colon
+        var colonIndex = secondaryQrValue.IndexOf(':');
+        string extractedValue;
+        
+        if (colonIndex >= 0)
+        {
+            extractedValue = secondaryQrValue.Substring(0, colonIndex).Trim();
+        }
+        else
+        {
+            extractedValue = secondaryQrValue.Trim();
+        }
+        
+        // Sanitize for filename use
+        extractedValue = SanitizeFileName(extractedValue);
+        
+        if (string.IsNullOrEmpty(extractedValue))
+        {
+            return fileName; // Return original if extraction failed
+        }
+        
+        // Replace pattern in filename (case-insensitive, at start of filename)
+        string newFileName;
+        if (fileName.StartsWith(replacementPattern, StringComparison.OrdinalIgnoreCase))
+        {
+            // Pattern is at the start - replace it
+            newFileName = extractedValue + fileName.Substring(replacementPattern.Length);
+        }
+        else
+        {
+            // Pattern not found - prepend extracted value
+            var fileNameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
+            var extension = Path.GetExtension(fileName);
+            newFileName = $"{extractedValue}_{fileNameWithoutExt}{extension}";
+        }
+        
+        return newFileName;
     }
 
     /// <summary>
