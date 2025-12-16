@@ -22,6 +22,7 @@ namespace TestBookletProcessor.WPF
         private readonly IRedPixelRemoverService _redPixelRemover = new RedPixelRemoverService();
         private readonly RegionQrScanner _qrScanner = new RegionQrScanner();
         private BookletProcessorService _bookletProcessor;
+        private ConcurrentProcessingService? _concurrentProcessor;
         private IConfigurationRoot _config;
         private byte _redThreshold;
         private bool _enableRedPixelRemover; // Used to decide whether to pass _redPixelRemover to BookletProcessorService
@@ -181,6 +182,31 @@ namespace TestBookletProcessor.WPF
 
             Console.WriteLine($"Red pixel remover enabled: {_enableRedPixelRemover}");
             Console.WriteLine($"QR scanning enabled: {enableQrScanning}");
+            
+            // Initialize concurrent processor for folder monitoring
+            var maxConcurrency = int.TryParse(_config["BookletProcessor:MaxConcurrency"], out var mc) ? mc : 4;
+            var concurrentConfig = new ConcurrentProcessingConfig
+            {
+                RedThreshold = _redThreshold,
+                Dpi = dpi,
+                EnableRedPixelRemover = _enableRedPixelRemover,
+                EnableQrScanning = enableQrScanning,
+                QrRegionXInches = qrXInches,
+                QrRegionYInches = qrYInches,
+                QrRegionWidthInches = qrWidthInches,
+                QrRegionHeightInches = qrHeightInches,
+                QrValuesExcludingRedRemoval = qrValues,
+                TemplateExclusionPatterns = templateExclusionPatterns,
+                ScannedSheetQrMapping = scannedSheetQrMapping,
+                RedPixelExclusionRegions = redPixelExclusionRegions,
+                SecondaryQrScanConfig = secondaryQrScanConfig,
+                ScannedSheetTemplateName = scannedSheetTemplateName
+            };
+            _concurrentProcessor = new ConcurrentProcessingService(concurrentConfig, maxConcurrency);
+            _concurrentProcessor.JobStarted += ConcurrentProcessor_JobStarted;
+            _concurrentProcessor.JobCompleted += ConcurrentProcessor_JobCompleted;
+            _concurrentProcessor.JobFailed += ConcurrentProcessor_JobFailed;
+            Console.WriteLine($"Concurrent processor initialized with MaxConcurrency={maxConcurrency}");
 
             // Set default folders from config
             InputPdfTextBox.Text = _config["BookletProcessor:DefaultInputFolder"];
@@ -208,63 +234,76 @@ namespace TestBookletProcessor.WPF
             }
         }
 
-        private async void FolderMonitorJobService_FileDetected(object? sender, FolderFileDetectedEventArgs e)
+        private void FolderMonitorJobService_FileDetected(object? sender, FolderFileDetectedEventArgs e)
         {
-            try
+            // Enqueue job for concurrent processing (non-blocking)
+            if (_concurrentProcessor != null)
             {
-                new ToastContentBuilder()
-                .AddText("Alignment Started")
-                .AddText($"Aligning detected file: {e.FilePath} with template: {e.TemplateFilePath}")
-                .Show(toast =>
-                {
-                    toast.ExpirationTime = DateTime.Now.AddSeconds(5);
-                });
-
-                // Use detected file and template for full booklet processing
-                var result = await _bookletProcessor.ProcessBookletsWorkflowAsync(
+                var jobId = _concurrentProcessor.EnqueueJob(
                     e.FilePath,
                     e.TemplateFilePath,
-                    e.OutputFolder,
-                    null);
-
-                if (result.Success)
-                {
-                    var message = $"Processing complete! {result.PagesProcessed} booklets processed in {result.ProcessingTime:mm\\:ss}. Output: {result.OutputPath}";
-
-                    new ToastContentBuilder()
-                        .AddText("Alignment Complete")
-                        .AddText(message)
-                        .Show(toast =>
-                        {
-                            toast.ExpirationTime = DateTime.Now.AddSeconds(5);
-                        });
-                }
-                else
-                {
-                    new ToastContentBuilder()
-     .AddText("Alignment Failed")
-              .AddText($"Error: {result.ErrorMessage}")
-      .Show(toast =>
- {
-        toast.ExpirationTime = DateTime.Now.AddSeconds(10);
-             });
-     }
-            }
-            catch (Exception ex)
-            {
-                // Show error toast notification
+                    e.OutputFolder);
+                
+                // Show queued notification
                 new ToastContentBuilder()
-     .AddText("Processing Error")
-          .AddText($"Failed to process file: {ex.Message}")
-          .Show(toast =>
-         {
-            toast.ExpirationTime = DateTime.Now.AddSeconds(10);
-             });
-
-             // Also log to console
-     Console.WriteLine($"Error processing file {e.FilePath}: {ex.Message}");
-         }
-   }
+                    .AddText("File Detected")
+                    .AddText($"Queued for processing: {Path.GetFileName(e.FilePath)}")
+                    .Show(toast =>
+                    {
+                        toast.ExpirationTime = DateTime.Now.AddSeconds(3);
+                    });
+            }
+        }
+        
+        private void ConcurrentProcessor_JobStarted(object? sender, ProcessingJobEventArgs e)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                new ToastContentBuilder()
+                    .AddText("Processing Started")
+                    .AddText($"File: {Path.GetFileName(e.Job.InputFilePath)}")
+                    .Show(toast =>
+                    {
+                        toast.ExpirationTime = DateTime.Now.AddSeconds(3);
+                    });
+            });
+        }
+        
+        private void ConcurrentProcessor_JobCompleted(object? sender, ProcessingJobEventArgs e)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                var duration = e.Job.Duration ?? TimeSpan.Zero;
+                var message = $"{Path.GetFileName(e.Job.InputFilePath)} completed in {duration:mm\\:ss}";
+                if (e.Job.Result != null)
+                {
+                    message += $"\nOutput: {Path.GetFileName(e.Job.Result.OutputPath)}";
+                }
+                
+                new ToastContentBuilder()
+                    .AddText("Processing Complete")
+                    .AddText(message)
+                    .Show(toast =>
+                    {
+                        toast.ExpirationTime = DateTime.Now.AddSeconds(5);
+                    });
+            });
+        }
+        
+        private void ConcurrentProcessor_JobFailed(object? sender, ProcessingJobEventArgs e)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                new ToastContentBuilder()
+                    .AddText("Processing Failed")
+                    .AddText($"{Path.GetFileName(e.Job.InputFilePath)}")
+                    .AddText($"Error: {e.Job.ErrorMessage}")
+                    .Show(toast =>
+                    {
+                        toast.ExpirationTime = DateTime.Now.AddSeconds(10);
+                    });
+            });
+        }
 
 
         private void BrowseInputPdf_Click(object sender, RoutedEventArgs e)
