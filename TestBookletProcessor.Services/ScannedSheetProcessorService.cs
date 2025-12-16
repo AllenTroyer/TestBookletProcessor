@@ -80,6 +80,10 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
     {
         var result = new ProcessingResult();
         var stopwatch = Stopwatch.StartNew();
+        
+        // Create unique working folder name (declare outside try for cleanup in finally)
+        var uniqueId = Guid.NewGuid().ToString("N");
+        var workingFolder = Path.Combine(outputFolder, $"temp_scannedsheets_{uniqueId}");
 
         try
         {
@@ -88,9 +92,7 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
             Console.WriteLine($"Template: {templatePdf}");
             Console.WriteLine($"QR Mappings: {qrMapping.Count} patterns");
 
-            // Create unique working folder
-            var uniqueId = Guid.NewGuid().ToString("N");
-            var workingFolder = Path.Combine(outputFolder, $"temp_scannedsheets_{uniqueId}");
+            // Create working folder
             Directory.CreateDirectory(workingFolder);
 
             // Split input PDF into individual pages
@@ -166,9 +168,6 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
             Console.WriteLine($"  Output: {finalOutputPath}");
             Console.WriteLine($"  Pages: {result.PagesProcessed}");
             Console.WriteLine($"  Time: {result.ProcessingTime.TotalSeconds:F2}s");
-
-            // Cleanup
-            PdfService.CleanupDirectory(workingFolder);
         }
         catch (Exception ex)
         {
@@ -177,6 +176,11 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
             stopwatch.Stop();
             result.ProcessingTime = stopwatch.Elapsed;
             Console.WriteLine($"\n? Processing failed: {ex.Message}");
+        }
+        finally
+        {
+            // Clean up the working folder (contains all temporary files)
+            PdfService.CleanupDirectory(workingFolder);
         }
 
         return result;
