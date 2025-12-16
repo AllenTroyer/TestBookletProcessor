@@ -180,6 +180,8 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
         finally
         {
             // Clean up the working folder (contains all temporary files)
+            // Use async cleanup with delay to ensure files are released
+            await Task.Delay(100); // Brief delay to ensure file handles released
             PdfService.CleanupDirectory(workingFolder);
         }
 

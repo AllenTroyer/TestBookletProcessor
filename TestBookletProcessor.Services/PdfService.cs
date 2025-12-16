@@ -164,8 +164,8 @@ public class PdfService : IPdfService
             double scale = Math.Min(page.Width.Point / image.PixelWidth, page.Height.Point / image.PixelHeight);
             double imgWidth = image.PixelWidth * scale;
             double imgHeight = image.PixelHeight * scale;
-            double x = (page.Width.Point - imgWidth) /2;
-            double y = (page.Height.Point - imgHeight) /2;
+            double x = (page.Width.Point - imgWidth) / 2;
+            double y = (page.Height.Point - imgHeight) / 2;
 
             using (var gfx = XGraphics.FromPdfPage(page))
             {
@@ -211,16 +211,56 @@ public class PdfService : IPdfService
 
     public static void CleanupDirectory(string path)
     {
-        if (Directory.Exists(path))
+        if (!Directory.Exists(path))
+            return;
+
+        const int maxAttempts = 5;
+        const int delayMs = 200;
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
             try
             {
+                // Force readonly attributes off for all files
+                var dirInfo = new DirectoryInfo(path);
+                foreach (var file in dirInfo.GetFiles("*", SearchOption.AllDirectories))
+                {
+                    try
+                    {
+                        file.Attributes = FileAttributes.Normal;
+                    }
+                    catch
+                    {
+                        // Ignore individual file attribute errors
+                    }
+                }
+
+                // Delete directory
                 Directory.Delete(path, true);
                 Console.WriteLine($"Cleaned up temporary folder: {path}");
+                return; // Success!
+            }
+            catch (IOException ex) when (attempt < maxAttempts)
+            {
+                // File might be locked, wait and retry
+                Console.WriteLine($"Cleanup attempt {attempt}/{maxAttempts} failed for {path}: {ex.Message}");
+                System.Threading.Thread.Sleep(delayMs);
+            }
+            catch (UnauthorizedAccessException ex) when (attempt < maxAttempts)
+            {
+                // Permission issue, wait and retry
+                Console.WriteLine($"Cleanup attempt {attempt}/{maxAttempts} failed (access denied) for {path}: {ex.Message}");
+                System.Threading.Thread.Sleep(delayMs);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to clean up folder {path}: {ex.Message}");
+                // Other errors
+                Console.WriteLine($"Failed to clean up folder {path} (attempt {attempt}/{maxAttempts}): {ex.Message}");
+                if (attempt == maxAttempts)
+                {
+                    Console.WriteLine($"⚠ WARNING: Temp folder not cleaned up: {path}");
+                    Console.WriteLine($"  You may need to manually delete this folder.");
+                }
             }
         }
     }
