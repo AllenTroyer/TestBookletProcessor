@@ -30,6 +30,7 @@ public class ConcurrentProcessingConfig
     public List<RedPixelExclusionRegion> RedPixelExclusionRegions { get; set; } = new();
     public SecondaryQrScanConfig? SecondaryQrScanConfig { get; set; }
     public string? ScannedSheetTemplateName { get; set; }
+    public ILoggingService? LoggingService { get; set; }
 }
 
 /// <summary>
@@ -45,6 +46,7 @@ public class ConcurrentProcessingService : IDisposable
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly int _maxConcurrency;
     private readonly ConcurrentProcessingConfig _config;
+    private readonly ILoggingService? _loggingService;
     
     /// <summary>
     /// Event raised when a job starts processing.
@@ -71,6 +73,7 @@ public class ConcurrentProcessingService : IDisposable
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _maxConcurrency = maxConcurrency;
         _concurrencyLimiter = new SemaphoreSlim(maxConcurrency, maxConcurrency);
+        _loggingService = config.LoggingService;
         
         Console.WriteLine($"[ConcurrentProcessor] Initialized with MaxConcurrency={_maxConcurrency}");
         
@@ -165,6 +168,23 @@ public class ConcurrentProcessingService : IDisposable
         Console.WriteLine($"[Job {job.JobId:N}] Starting: {Path.GetFileName(job.InputFilePath)}");
         JobStarted?.Invoke(this, new ProcessingJobEventArgs(job));
         
+        // Determine processing mode
+        string processingMode = (!string.IsNullOrEmpty(_config.ScannedSheetTemplateName) && 
+                                Path.GetFileName(job.TemplateFilePath).Equals(_config.ScannedSheetTemplateName, StringComparison.OrdinalIgnoreCase))
+            ? "ScannedSheets"
+            : "Booklet";
+        
+        // Log job started
+        if (_loggingService != null)
+        {
+            await _loggingService.LogJobStartedAsync(
+                job, 
+                _config.Dpi, 
+                _config.EnableRedPixelRemover, 
+                _config.EnableQrScanning, 
+                processingMode);
+        }
+        
         try
         {
             // Wait for file to be fully written (important for FileSystemWatcher)
@@ -236,11 +256,35 @@ public class ConcurrentProcessingService : IDisposable
                 var duration = job.CompletedTime.Value - job.StartedTime.Value;
                 Console.WriteLine($"[Job {job.JobId:N}] ? Completed in {duration:mm\\:ss}");
                 Console.WriteLine($"[Job {job.JobId:N}] Output: {result.OutputPath}");
+                
+                // Log job completed
+                if (_loggingService != null)
+                {
+                    await _loggingService.LogJobCompletedAsync(
+                        job, 
+                        _config.Dpi, 
+                        _config.EnableRedPixelRemover, 
+                        _config.EnableQrScanning, 
+                        processingMode);
+                }
+                
                 JobCompleted?.Invoke(this, new ProcessingJobEventArgs(job));
             }
             else
             {
                 Console.WriteLine($"[Job {job.JobId:N}] ? Failed: {result.ErrorMessage}");
+                
+                // Log job failed
+                if (_loggingService != null)
+                {
+                    await _loggingService.LogJobFailedAsync(
+                        job, 
+                        _config.Dpi, 
+                        _config.EnableRedPixelRemover, 
+                        _config.EnableQrScanning, 
+                        processingMode);
+                }
+                
                 JobFailed?.Invoke(this, new ProcessingJobEventArgs(job));
             }
         }
@@ -251,6 +295,18 @@ public class ConcurrentProcessingService : IDisposable
             job.CompletedTime = DateTime.Now;
             
             Console.WriteLine($"[Job {job.JobId:N}] ? Exception: {ex.Message}");
+            
+            // Log job failed
+            if (_loggingService != null)
+            {
+                await _loggingService.LogJobFailedAsync(
+                    job, 
+                    _config.Dpi, 
+                    _config.EnableRedPixelRemover, 
+                    _config.EnableQrScanning, 
+                    processingMode);
+            }
+            
             JobFailed?.Invoke(this, new ProcessingJobEventArgs(job));
         }
         finally
@@ -329,3 +385,4 @@ public class ConcurrentProcessingService : IDisposable
         Console.WriteLine("[ConcurrentProcessor] Disposed");
     }
 }
+

@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows;
 using QrRegionScanner;
@@ -25,15 +26,29 @@ namespace TestBookletProcessor.WPF
         private ConcurrentProcessingService? _concurrentProcessor;
         private IConfigurationRoot _config;
         private byte _redThreshold;
-        private bool _enableRedPixelRemover; // Used to decide whether to pass _redPixelRemover to BookletProcessorService
+        private bool _enableRedPixelRemover;
         private IFolderMonitorJobService _folderMonitorJobService;
         private string _tempFolder;
+        private ILoggingService _loggingService;
+        private int _dpi;
+        private bool _enableQrScanning;
+        private string? _scannedSheetTemplateName;
 
         public MainWindow()
         {
             InitializeComponent();
-            // Removed duplicate AUMID call - already set in App.xaml.cs
+            
             _config = ConfigurationHelper.LoadConfiguration();
+            
+            // Initialize logging service
+            _loggingService = CreateLoggingService(_config);
+            
+            // Log application start
+            var appVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString();
+            var maxConcurrency = int.TryParse(_config["BookletProcessor:MaxConcurrency"], out var mc) ? mc : 4;
+            _ = _loggingService.LogApplicationStartAsync(appVersion, maxConcurrency);
+            
+            // Removed duplicate AUMID call - already set in App.xaml.cs
             var thresholdStr = _config?["BookletProcessor:RedPixelThreshold"];
             _redThreshold = byte.TryParse(thresholdStr, out var val) ? val : (byte)200;
             var enableRedStr = _config?["BookletProcessor:EnableRedPixelRemover"];
@@ -41,11 +56,11 @@ namespace TestBookletProcessor.WPF
 
             // Get DPI setting
             var dpiStr = _config?["BookletProcessor:DefaultDpi"];
-            var dpi = int.TryParse(dpiStr, out var dpiVal) ? dpiVal : 300;
+            _dpi = int.TryParse(dpiStr, out var dpiVal) ? dpiVal : 300;
 
             // Load QR scanner configuration
             var enableQrStr = _config?["BookletProcessor:QrScanner:EnableQrScanning"];
-            bool enableQrScanning = enableQrStr != null && enableQrStr.Equals("true", StringComparison.OrdinalIgnoreCase);
+            _enableQrScanning = enableQrStr != null && enableQrStr.Equals("true", StringComparison.OrdinalIgnoreCase);
             
             double qrXInches = double.TryParse(_config?["BookletProcessor:QrScanner:QrRegionXInches"], out var xi) ? xi : 6.5;
             double qrYInches = double.TryParse(_config?["BookletProcessor:QrScanner:QrRegionYInches"], out var yi) ? yi : 9.0;
@@ -62,7 +77,7 @@ namespace TestBookletProcessor.WPF
                           new List<string> { "*TEMPLATE*", "*BLANK*", "*SAMPLE*" };
             
             // Load Scanned Sheet Configuration
-            var scannedSheetTemplateName = _config?["BookletProcessor:ScannedSheets:TemplateName"];
+            _scannedSheetTemplateName = _config?["BookletProcessor:ScannedSheets:TemplateName"];
             var scannedSheetQrMappingSection = _config?.GetSection("BookletProcessor:ScannedSheets:QrToPageMapping");
             var scannedSheetQrMapping = new Dictionary<string, int>();
             if (scannedSheetQrMappingSection != null)
@@ -148,7 +163,7 @@ namespace TestBookletProcessor.WPF
             
             // Create scanned sheet processor
             IScannedSheetProcessor? scannedSheetProcessor = null;
-            if (!string.IsNullOrEmpty(scannedSheetTemplateName))
+            if (!string.IsNullOrEmpty(_scannedSheetTemplateName))
             {
                 scannedSheetProcessor = new ScannedSheetProcessorService(
                     _pdfService,
@@ -156,13 +171,13 @@ namespace TestBookletProcessor.WPF
                     _aligner,
                     _enableRedPixelRemover ? _redPixelRemover : null,
                     _redThreshold,
-                    enableQrScanning ? _qrScanner : null,
-                    enableQrScanning,
+                    _enableQrScanning ? _qrScanner : null,
+                    _enableQrScanning,
                     qrXInches,
                     qrYInches,
                     qrWidthInches,
                     qrHeightInches,
-                    dpi,
+                    _dpi,
                     qrValues,
                     redPixelExclusionRegions,
                     secondaryQrScanConfig);
@@ -174,9 +189,9 @@ namespace TestBookletProcessor.WPF
                 _aligner,
                 _enableRedPixelRemover ? _redPixelRemover : null,
                 _redThreshold,
-                dpi,
-                enableQrScanning ? _qrScanner : null,
-                enableQrScanning,
+                _dpi,
+                _enableQrScanning ? _qrScanner : null,
+                _enableQrScanning,
                 qrXInches,
                 qrYInches,
                 qrWidthInches,
@@ -184,20 +199,19 @@ namespace TestBookletProcessor.WPF
                 qrValues,
                 templateExclusionPatterns,
                 scannedSheetProcessor,
-                scannedSheetTemplateName,
+                _scannedSheetTemplateName,
                 scannedSheetQrMapping);
 
             Console.WriteLine($"Red pixel remover enabled: {_enableRedPixelRemover}");
-            Console.WriteLine($"QR scanning enabled: {enableQrScanning}");
+            Console.WriteLine($"QR scanning enabled: {_enableQrScanning}");
             
             // Initialize concurrent processor for folder monitoring
-            var maxConcurrency = int.TryParse(_config["BookletProcessor:MaxConcurrency"], out var mc) ? mc : 4;
             var concurrentConfig = new ConcurrentProcessingConfig
             {
                 RedThreshold = _redThreshold,
-                Dpi = dpi,
+                Dpi = _dpi,
                 EnableRedPixelRemover = _enableRedPixelRemover,
-                EnableQrScanning = enableQrScanning,
+                EnableQrScanning = _enableQrScanning,
                 QrRegionXInches = qrXInches,
                 QrRegionYInches = qrYInches,
                 QrRegionWidthInches = qrWidthInches,
@@ -207,7 +221,8 @@ namespace TestBookletProcessor.WPF
                 ScannedSheetQrMapping = scannedSheetQrMapping,
                 RedPixelExclusionRegions = redPixelExclusionRegions,
                 SecondaryQrScanConfig = secondaryQrScanConfig,
-                ScannedSheetTemplateName = scannedSheetTemplateName
+                ScannedSheetTemplateName = _scannedSheetTemplateName,
+                LoggingService = _loggingService
             };
             _concurrentProcessor = new ConcurrentProcessingService(concurrentConfig, maxConcurrency);
             _concurrentProcessor.JobStarted += ConcurrentProcessor_JobStarted;
@@ -363,6 +378,26 @@ namespace TestBookletProcessor.WPF
                 string outputFolder = Path.Combine(Path.GetDirectoryName(inputPdf)!, "BookletOutput");
                 StatusTextBlock.Text = "Processing...";
                 int totalBooklets = 0;
+                
+                // Create job for logging
+                var job = new ProcessingJob
+                {
+                    InputFilePath = inputPdf,
+                    TemplateFilePath = templatePdf,
+                    OutputFolder = outputFolder,
+                    Status = ProcessingJobStatus.Processing
+                };
+                
+                job.StartedTime = DateTime.Now;
+                
+                // Determine processing mode
+                string processingMode = (!string.IsNullOrEmpty(_scannedSheetTemplateName) && 
+                                        Path.GetFileName(templatePdf).Equals(_scannedSheetTemplateName, StringComparison.OrdinalIgnoreCase))
+                    ? "ScannedSheets"
+                    : "Booklet";
+                
+                // Log job started
+                await _loggingService.LogJobStartedAsync(job, _dpi, _enableRedPixelRemover, _enableQrScanning, processingMode);
 
                 var result = await _bookletProcessor.ProcessBookletsWorkflowAsync(
                     inputPdf,
@@ -379,13 +414,21 @@ namespace TestBookletProcessor.WPF
                         totalBooklets = total;
                     });
 
+                job.Result = result;
+                job.Status = result.Success ? ProcessingJobStatus.Completed : ProcessingJobStatus.Failed;
+                job.ErrorMessage = result.ErrorMessage;
+                job.CompletedTime = DateTime.Now;
+
+                // Log job result
                 if (result.Success)
                 {
+                    await _loggingService.LogJobCompletedAsync(job, _dpi, _enableRedPixelRemover, _enableQrScanning, processingMode);
                     StatusTextBlock.Text = $"Processing complete! {result.PagesProcessed} booklets processed in {result.ProcessingTime.ToString(@"mm\:ss")}. Output: {result.OutputPath}";
                     ProcessingProgressBar.Value = totalBooklets;
                 }
                 else
                 {
+                    await _loggingService.LogJobFailedAsync(job, _dpi, _enableRedPixelRemover, _enableQrScanning, processingMode);
                     StatusTextBlock.Text = $"Error: {result.ErrorMessage}";
                     ProcessingProgressBar.Value = 0;
                 }
@@ -404,6 +447,43 @@ namespace TestBookletProcessor.WPF
                 BrowseTemplateButton.IsEnabled = true;
                 ProcessingProgressBar.Visibility = Visibility.Collapsed;
             }
+        }
+
+        private ILoggingService CreateLoggingService(IConfigurationRoot config)
+        {
+            var loggingConfig = new LoggingServiceConfig();
+            
+            var logDir = config["Logging:LogDirectory"];
+            if (!string.IsNullOrWhiteSpace(logDir))
+            {
+                loggingConfig.LogDirectory = logDir;
+            }
+            
+            var format = config["Logging:Format"];
+            if (Enum.TryParse<LogFormat>(format, true, out var logFormat))
+            {
+                loggingConfig.Format = logFormat;
+            }
+            
+            var enableRotation = config["Logging:EnableLogRotation"];
+            if (bool.TryParse(enableRotation, out var rotation))
+            {
+                loggingConfig.EnableLogRotation = rotation;
+            }
+            
+            var maxSize = config["Logging:MaxLogFileSizeBytes"];
+            if (long.TryParse(maxSize, out var size))
+            {
+                loggingConfig.MaxLogFileSizeBytes = size;
+            }
+            
+            var maxFiles = config["Logging:MaxLogFiles"];
+            if (int.TryParse(maxFiles, out var files))
+            {
+                loggingConfig.MaxLogFiles = files;
+            }
+            
+            return new LoggingService(loggingConfig);
         }
 
         private void OpenSettings_Click(object sender, RoutedEventArgs e)
@@ -561,6 +641,13 @@ namespace TestBookletProcessor.WPF
             var jobsWindow = new FolderMonitorJobsWindow(_folderMonitorJobService);
             jobsWindow.Owner = this;
             jobsWindow.ShowDialog();
+        }
+        
+        protected override void OnClosed(EventArgs e)
+        {
+            // Log application stop
+            _ = _loggingService.LogApplicationStopAsync();
+            base.OnClosed(e);
         }
     }
 }

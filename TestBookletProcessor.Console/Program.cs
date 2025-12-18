@@ -4,6 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using TestBookletProcessor.Core.Interfaces;
 using TestBookletProcessor.Core.Models;
@@ -11,8 +13,22 @@ using TestBookletProcessor.Services;
 
 partial class Program
 {
+    private static ILoggingService? _loggingService;
+    
     static async Task Main(string[] args)
     {
+        // Initialize logging service
+        var config = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+            .Build();
+        
+        _loggingService = CreateLoggingService(config);
+        
+        // Log application start
+        var appVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString();
+        await _loggingService.LogApplicationStartAsync(appVersion);
+        
         Console.WriteLine("=== Test Booklet Processor Console ===");
         Console.WriteLine("Select test mode:");
         Console.WriteLine("1. QR Code Scanner Test");
@@ -33,6 +49,46 @@ partial class Program
         {
             Console.WriteLine("Invalid choice. Exiting.");
         }
+        
+        // Log application stop
+        await _loggingService.LogApplicationStopAsync();
+    }
+
+    static ILoggingService CreateLoggingService(IConfigurationRoot config)
+    {
+        var loggingConfig = new LoggingServiceConfig();
+        
+        var logDir = config["Logging:LogDirectory"];
+        if (!string.IsNullOrWhiteSpace(logDir))
+        {
+            loggingConfig.LogDirectory = logDir;
+        }
+        
+        var format = config["Logging:Format"];
+        if (Enum.TryParse<LogFormat>(format, true, out var logFormat))
+        {
+            loggingConfig.Format = logFormat;
+        }
+        
+        var enableRotation = config["Logging:EnableLogRotation"];
+        if (bool.TryParse(enableRotation, out var rotation))
+        {
+            loggingConfig.EnableLogRotation = rotation;
+        }
+        
+        var maxSize = config["Logging:MaxLogFileSizeBytes"];
+        if (long.TryParse(maxSize, out var size))
+        {
+            loggingConfig.MaxLogFileSizeBytes = size;
+        }
+        
+        var maxFiles = config["Logging:MaxLogFiles"];
+        if (int.TryParse(maxFiles, out var files))
+        {
+            loggingConfig.MaxLogFiles = files;
+        }
+        
+        return new LoggingService(loggingConfig);
     }
 
     static async Task TestQrCodeScanner()
@@ -313,6 +369,29 @@ partial class Program
         scannedSheetQrMapping
         );
 
+        // Create job for logging
+        var job = new ProcessingJob
+        {
+            InputFilePath = inputPdf,
+            TemplateFilePath = templatePdf,
+            OutputFolder = outputFolder,
+            Status = ProcessingJobStatus.Processing
+        };
+        
+        job.StartedTime = DateTime.Now;
+        
+        // Determine processing mode
+        string processingMode = (!string.IsNullOrEmpty(scannedSheetTemplateName) && 
+                                Path.GetFileName(templatePdf).Equals(scannedSheetTemplateName, StringComparison.OrdinalIgnoreCase))
+            ? "ScannedSheets"
+            : "Booklet";
+        
+        // Log job started
+        if (_loggingService != null)
+        {
+            await _loggingService.LogJobStartedAsync(job, dpi, enableRedPixelRemover, enableQrScanning, processingMode);
+        }
+
         try
         {
             // Use ProcessBookletsWorkflowAsync which includes auto-detection for scanned sheet mode
@@ -321,6 +400,24 @@ partial class Program
                 templatePdf,
                 outputFolder,
                 null); // No progress callback for console
+
+            job.Result = result;
+            job.Status = result.Success ? ProcessingJobStatus.Completed : ProcessingJobStatus.Failed;
+            job.ErrorMessage = result.ErrorMessage;
+            job.CompletedTime = DateTime.Now;
+
+            // Log job result
+            if (_loggingService != null)
+            {
+                if (result.Success)
+                {
+                    await _loggingService.LogJobCompletedAsync(job, dpi, enableRedPixelRemover, enableQrScanning, processingMode);
+                }
+                else
+                {
+                    await _loggingService.LogJobFailedAsync(job, dpi, enableRedPixelRemover, enableQrScanning, processingMode);
+                }
+            }
 
             if (result.Success)
             {
@@ -335,6 +432,16 @@ partial class Program
         }
         catch (Exception ex)
         {
+            job.Status = ProcessingJobStatus.Failed;
+            job.ErrorMessage = ex.Message;
+            job.CompletedTime = DateTime.Now;
+            
+            // Log job failed
+            if (_loggingService != null)
+            {
+                await _loggingService.LogJobFailedAsync(job, dpi, enableRedPixelRemover, enableQrScanning, processingMode);
+            }
+            
             Console.WriteLine($"Test failed: {ex.Message}");
         }
 
