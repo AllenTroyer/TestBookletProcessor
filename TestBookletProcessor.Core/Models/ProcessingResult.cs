@@ -55,5 +55,11 @@ namespace TestBookletProcessor.Core.Models
         /// Gets or sets whether QR scanning was enabled.
         /// </summary>
         public bool? QrScanningEnabled { get; set; }
+        
+        /// <summary>
+        /// Gets or sets the list of extracted file paths (e.g., raw forms).
+        /// Used in scanned sheet processing when sheets are extracted as separate files.
+        /// </summary>
+        public List<string> ExtractedFiles { get; set; } = new();
     }
 }

@@ -30,6 +30,7 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
     private readonly List<string> _qrValuesExcludingRedRemoval;
     private readonly List<RedPixelExclusionRegion> _redPixelExclusionRegions;
     private readonly SecondaryQrScanConfig? _secondaryQrScanConfig;
+    private readonly RawFormExtractionConfig? _rawFormExtractionConfig;
 
     public ScannedSheetProcessorService(
         IPdfService pdfService,
@@ -46,7 +47,8 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
         int dpi = 300,
         List<string>? qrValuesExcludingRedRemoval = null,
         List<RedPixelExclusionRegion>? redPixelExclusionRegions = null,
-        SecondaryQrScanConfig? secondaryQrScanConfig = null)
+        SecondaryQrScanConfig? secondaryQrScanConfig = null,
+        RawFormExtractionConfig? rawFormExtractionConfig = null)
     {
         _pdfService = pdfService;
         _deskewer = deskewer;
@@ -67,6 +69,7 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
         
         _redPixelExclusionRegions = redPixelExclusionRegions ?? new List<RedPixelExclusionRegion>();
         _secondaryQrScanConfig = secondaryQrScanConfig;
+        _rawFormExtractionConfig = rawFormExtractionConfig;
     }
 
     public async Task<ProcessingResult> ProcessScannedSheetsAsync(
@@ -108,6 +111,9 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
 
             var processedPages = new List<string>();
             
+            // Track pages for raw form extraction
+            var extractionPages = new List<RawFormExtractionInfo>();
+            
             // Track secondary QR value for file naming
             string? secondaryQrValue = null;
 
@@ -119,7 +125,7 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
                 progressCallback?.Invoke(pageNum, totalPages);
 
                 var inputPage = inputPages[i];
-                var (processedPage, scannedSecondaryQr) = await ProcessSinglePageAsync(
+                var (processedPage, scannedSecondaryQr, extractionInfo) = await ProcessSinglePageAsync(
                     inputPage,
                     templatePages,
                     qrMapping,
@@ -135,11 +141,42 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
                     secondaryQrValue = scannedSecondaryQr;
                     Console.WriteLine($"  ? Secondary QR captured for file naming: {secondaryQrValue}");
                 }
+                
+                // Track page for extraction if flagged
+                if (extractionInfo != null)
+                {
+                    extractionInfo.SecondaryQrValue = scannedSecondaryQr ?? secondaryQrValue;
+                    extractionPages.Add(extractionInfo);
+                    Console.WriteLine($"  ? Page flagged for raw form extraction");
+                }
             }
 
             // Merge all processed pages
             Console.WriteLine($"\nMerging {processedPages.Count} processed pages...");
             await _pdfService.MergePdfsAsync(processedPages, outputPdf);
+            
+            // Extract raw form sheets if any were flagged
+            var extractedFiles = new List<string>();
+            if (extractionPages.Any())
+            {
+                Console.WriteLine($"\n=== Extracting Raw Form Sheets ===");
+                Console.WriteLine($"Pages to extract: {extractionPages.Count}");
+                
+                for (int i = 0; i < extractionPages.Count; i++)
+                {
+                    var extractionInfo = extractionPages[i];
+                    var extractedPath = await ExtractRawFormSheet(
+                        extractionInfo,
+                        outputPdf,
+                        outputFolder,
+                        extractionPages.Count);
+                    
+                    extractionInfo.ExtractedFilePath = extractedPath;
+                    extractedFiles.Add(extractedPath);
+                }
+                
+                Console.WriteLine($"? {extractedFiles.Count} raw form(s) extracted successfully");
+            }
             
             // Apply dynamic file naming if secondary QR was found
             string finalOutputPath = outputPdf;
@@ -207,12 +244,17 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
             result.Success = true;
             result.OutputPath = finalOutputPath;
             result.PagesProcessed = processedPages.Count;
+            result.ExtractedFiles = extractedFiles;
             stopwatch.Stop();
             result.ProcessingTime = stopwatch.Elapsed;
 
             Console.WriteLine($"\n? Processing complete!");
             Console.WriteLine($"  Output: {finalOutputPath}");
             Console.WriteLine($"  Pages: {result.PagesProcessed}");
+            if (extractedFiles.Any())
+            {
+                Console.WriteLine($"  Extracted: {extractedFiles.Count} raw form(s)");
+            }
             Console.WriteLine($"  Time: {result.ProcessingTime.TotalSeconds:F2}s");
         }
         catch (Exception ex)
@@ -234,7 +276,7 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
         return result;
     }
 
-    private async Task<(string processedPagePdf, string? secondaryQrValue)> ProcessSinglePageAsync(
+    private async Task<(string processedPagePdf, string? secondaryQrValue, RawFormExtractionInfo? extractionInfo)> ProcessSinglePageAsync(
         string inputPagePdf,
         List<string> templatePages,
         Dictionary<string, int> qrMapping,
@@ -257,6 +299,7 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
         string? qrCode = null;
         string? secondaryQrValue = null;
         int? templatePageIndex = null;
+        RawFormExtractionInfo? extractionInfo = null;
 
         if (_enableQrScanning && _qrScanner != null)
         {
@@ -267,6 +310,19 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
                 if (qrCode != null)
                 {
                     Console.WriteLine($"  QR Code: {qrCode}");
+                    
+                    // Check if this QR code triggers extraction
+                    if (_rawFormExtractionConfig?.ShouldExtract(qrCode) == true)
+                    {
+                        Console.WriteLine($"  ? Raw form extraction triggered by QR: {qrCode}");
+                        extractionInfo = new RawFormExtractionInfo
+                        {
+                            PageNumber = pageNumber,
+                            PrimaryQrCode = qrCode
+                            // ProcessedPagePdf will be set after processing completes
+                        };
+                    }
+                    
                     templatePageIndex = FindTemplatePageForQr(qrCode, qrMapping);
                     
                     if (templatePageIndex.HasValue)
@@ -311,7 +367,14 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
         {
             var unchangedPdf = Path.Combine(pageFolder, "output.pdf");
             await _pdfService.ConvertImageToPdfAsync(deskewedImage, unchangedPdf);
-            return (unchangedPdf, secondaryQrValue);
+            
+            // Set processed page path for extraction if needed
+            if (extractionInfo != null)
+            {
+                extractionInfo.ProcessedPagePdf = unchangedPdf;
+            }
+            
+            return (unchangedPdf, secondaryQrValue, extractionInfo);
         }
 
         // Get the corresponding template page
@@ -323,6 +386,13 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
         var shouldApplyRedRemoval = _redPixelRemover != null && qrCode != null &&
                                     !_qrValuesExcludingRedRemoval.Any(pattern =>
                                         MatchesWildcard(qrCode, pattern, ignoreCase: true));
+
+        // Skip red removal if this page is flagged for extraction and config says to skip
+        if (extractionInfo != null && _rawFormExtractionConfig?.SkipRedRemoval == true)
+        {
+            shouldApplyRedRemoval = false;
+            Console.WriteLine($"  ? Skipping red removal for extracted raw form");
+        }
 
         var imageToAlign = deskewedImage;
         if (shouldApplyRedRemoval)
@@ -361,7 +431,13 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
         var outputPdf = Path.Combine(pageFolder, "output.pdf");
         await _pdfService.ConvertImageToPdfAsync(alignedImage, outputPdf);
 
-        return (outputPdf, secondaryQrValue);
+        // Set processed page path for extraction if needed
+        if (extractionInfo != null)
+        {
+            extractionInfo.ProcessedPagePdf = outputPdf;
+        }
+
+        return (outputPdf, secondaryQrValue, extractionInfo);
     }
 
     private int? FindTemplatePageForQr(string qrCode, Dictionary<string, int> mapping)
@@ -527,6 +603,94 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
         }
         
         return newFileName;
+    }
+
+    /// <summary>
+    /// Extracts a raw form sheet as a separate PDF file.
+    /// /// </summary>
+    /// <param name="extractionInfo">Information about the page to extract</param>
+    /// <param name="baseOutputPath">Base output path for naming reference</param>
+    /// <param name="outputFolder">Folder where extracted file should be saved</param>
+    /// <param name="extractionCount">Number of extractions so far (for uniqueness)</param>
+    /// <returns>Path to the extracted file</returns>
+    private async Task<string> ExtractRawFormSheet(
+        RawFormExtractionInfo extractionInfo,
+        string baseOutputPath,
+        string outputFolder,
+        int extractionCount)
+    {
+        if (_rawFormExtractionConfig == null)
+            throw new InvalidOperationException("Raw form extraction config is not initialized");
+
+        // Determine output folder
+        var targetFolder = _rawFormExtractionConfig.ExtractToSeparateFolder
+            ? _rawFormExtractionConfig.ExtractionFolder
+            : outputFolder;
+
+        // Ensure target folder exists
+        Directory.CreateDirectory(targetFolder);
+
+        // Build filename
+        string baseFileName;
+        
+        if (!string.IsNullOrEmpty(extractionInfo.SecondaryQrValue))
+        {
+            // Use secondary QR value for naming
+            var colonIndex = extractionInfo.SecondaryQrValue.IndexOf(':');
+            string extractedValue;
+            
+            if (colonIndex >= 0)
+            {
+                extractedValue = extractionInfo.SecondaryQrValue.Substring(0, colonIndex).Trim();
+            }
+            else
+            {
+                extractedValue = extractionInfo.SecondaryQrValue.Trim();
+            }
+            
+            extractedValue = SanitizeFileName(extractedValue);
+            baseFileName = string.IsNullOrEmpty(extractedValue) 
+                ? Path.GetFileNameWithoutExtension(baseOutputPath) 
+                : extractedValue;
+        }
+        else
+        {
+            // Use base output filename
+            baseFileName = Path.GetFileNameWithoutExtension(baseOutputPath);
+        }
+
+        // Add suffix
+        var suffix = _rawFormExtractionConfig.FileNameSuffix;
+        var fileName = $"{baseFileName}_{suffix}";
+
+        // Add page number if configured and there are multiple extractions
+        if (_rawFormExtractionConfig.IncludePageNumberInFileName && extractionCount > 1)
+        {
+            fileName += $"_Page{extractionInfo.PageNumber}";
+        }
+
+        fileName += ".pdf";
+
+        var extractedFilePath = Path.Combine(targetFolder, fileName);
+
+        // Handle file conflicts
+        if (File.Exists(extractedFilePath))
+        {
+            var timestamp = DateTime.Now.ToString("yyyyMMddHHmmss");
+            var fileNameWithoutExt = Path.GetFileNameWithoutExtension(extractedFilePath);
+            extractedFilePath = Path.Combine(targetFolder, $"{fileNameWithoutExt}_{timestamp}.pdf");
+        }
+
+        // Copy the processed page to the extraction location
+        File.Copy(extractionInfo.ProcessedPagePdf, extractedFilePath, overwrite: false);
+
+        Console.WriteLine($"\n  ? Raw Form Extracted:");
+        Console.WriteLine($"    Page: {extractionInfo.PageNumber}");
+        Console.WriteLine($"    QR Code: {extractionInfo.PrimaryQrCode}");
+        Console.WriteLine($"    File: {Path.GetFileName(extractedFilePath)}");
+        Console.WriteLine($"    Location: {targetFolder}");
+
+        return extractedFilePath;
     }
 
     /// <summary>

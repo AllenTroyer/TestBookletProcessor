@@ -29,6 +29,7 @@ public class ConcurrentProcessingConfig
     public Dictionary<string, int> ScannedSheetQrMapping { get; set; } = new();
     public List<RedPixelExclusionRegion> RedPixelExclusionRegions { get; set; } = new();
     public SecondaryQrScanConfig? SecondaryQrScanConfig { get; set; }
+    public RawFormExtractionConfig? RawFormExtractionConfig { get; set; }
     public string? ScannedSheetTemplateName { get; set; }
     public ILoggingService? LoggingService { get; set; }
 }
@@ -216,7 +217,8 @@ public class ConcurrentProcessingService : IDisposable
                     _config.Dpi,
                     _config.QrValuesExcludingRedRemoval,
                     _config.RedPixelExclusionRegions,
-                    _config.SecondaryQrScanConfig);
+                    _config.SecondaryQrScanConfig,
+                    _config.RawFormExtractionConfig);
             }
             
             // Create booklet processor with isolated instances
@@ -385,4 +387,3 @@ public class ConcurrentProcessingService : IDisposable
         Console.WriteLine("[ConcurrentProcessor] Disposed");
     }
 }
-

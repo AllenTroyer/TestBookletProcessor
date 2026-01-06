@@ -217,7 +217,8 @@ public class LoggingService : ILoggingService
             Dpi = dpi,
             RedPixelRemovalEnabled = redPixelRemovalEnabled,
             QrScanningEnabled = qrScanningEnabled,
-            ProcessingMode = processingMode
+            ProcessingMode = processingMode,
+            ExtractedFilesCount = job.Result?.ExtractedFiles?.Count
         };
         
         // Get file sizes if files exist
@@ -282,6 +283,7 @@ public class LoggingService : ILoggingService
             "RedPixelRemovalEnabled",
             "QrScanningEnabled",
             "ProcessingMode",
+            "ExtractedFilesCount",
             "PagesPerMinute",
             "SecondsPerPage");
     }
@@ -314,6 +316,7 @@ public class LoggingService : ILoggingService
             entry.RedPixelRemovalEnabled?.ToString() ?? "",
             entry.QrScanningEnabled?.ToString() ?? "",
             EscapeCsv(entry.ProcessingMode),
+            entry.ExtractedFilesCount?.ToString() ?? "",
             entry.PagesPerMinute?.ToString("F2", CultureInfo.InvariantCulture) ?? "",
             entry.SecondsPerPage?.ToString("F2", CultureInfo.InvariantCulture) ?? "");
     }

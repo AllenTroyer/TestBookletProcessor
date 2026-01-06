@@ -168,6 +168,11 @@ public class LogEntry
     public string? ProcessingMode { get; set; }
     
     /// <summary>
+    /// Gets or sets the number of raw form sheets extracted as separate files.
+    /// </summary>
+    public int? ExtractedFilesCount { get; set; }
+    
+    /// <summary>
     /// Gets the processing rate in pages per minute.
     /// </summary>
     public double? PagesPerMinute

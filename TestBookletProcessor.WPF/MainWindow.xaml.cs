@@ -48,6 +48,10 @@ namespace TestBookletProcessor.WPF
             var maxConcurrency = int.TryParse(_config["BookletProcessor:MaxConcurrency"], out var mc) ? mc : 4;
             _ = _loggingService.LogApplicationStartAsync(appVersion, maxConcurrency);
             
+            // Log config file location for troubleshooting
+            var configFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");
+            Console.WriteLine($"Using configuration file: {configFilePath}");
+            
             // Removed duplicate AUMID call - already set in App.xaml.cs
             var thresholdStr = _config?["BookletProcessor:RedPixelThreshold"];
             _redThreshold = byte.TryParse(thresholdStr, out var val) ? val : (byte)200;
@@ -161,6 +165,38 @@ namespace TestBookletProcessor.WPF
                 }
             }
             
+            // Load Raw Form Extraction Configuration
+            RawFormExtractionConfig? rawFormExtractionConfig = null;
+            var rawFormSection = _config?.GetSection("BookletProcessor:ScannedSheets:RawFormExtraction");
+            if (rawFormSection != null && rawFormSection.Exists())
+            {
+                rawFormExtractionConfig = new RawFormExtractionConfig
+                {
+                    Enabled = rawFormSection["Enabled"]?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? true,
+                    ExtractToSeparateFolder = rawFormSection["ExtractToSeparateFolder"]?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? false,
+                    ExtractionFolder = rawFormSection["ExtractionFolder"] ?? @"C:\TestBooklets\Output\RawForms",
+                    FileNameSuffix = rawFormSection["FileNameSuffix"] ?? "RawForm",
+                    IncludePageNumberInFileName = rawFormSection["IncludePageNumberInFileName"]?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? true,
+                    SkipRedRemoval = rawFormSection["SkipRedRemoval"]?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? true
+                };
+
+                var triggerQrSection = rawFormSection.GetSection("TriggerQrCodes");
+                if (triggerQrSection != null)
+                {
+                    rawFormExtractionConfig.TriggerQrCodes = triggerQrSection.GetChildren()
+                        .Select(c => c.Value ?? "")
+                        .Where(v => !string.IsNullOrEmpty(v))
+                        .ToList();
+                }
+
+                if (rawFormExtractionConfig.Enabled)
+                {
+                    Console.WriteLine($"Raw form extraction enabled:");
+                    Console.WriteLine($"  Trigger QR codes: {string.Join(", ", rawFormExtractionConfig.TriggerQrCodes)}");
+                    Console.WriteLine($"  Skip red removal: {rawFormExtractionConfig.SkipRedRemoval}");
+                }
+            }
+            
             // Create scanned sheet processor
             IScannedSheetProcessor? scannedSheetProcessor = null;
             if (!string.IsNullOrEmpty(_scannedSheetTemplateName))
@@ -180,7 +216,8 @@ namespace TestBookletProcessor.WPF
                     _dpi,
                     qrValues,
                     redPixelExclusionRegions,
-                    secondaryQrScanConfig);
+                    secondaryQrScanConfig,
+                    rawFormExtractionConfig);
             }
 
             _bookletProcessor = new BookletProcessorService(
@@ -221,6 +258,7 @@ namespace TestBookletProcessor.WPF
                 ScannedSheetQrMapping = scannedSheetQrMapping,
                 RedPixelExclusionRegions = redPixelExclusionRegions,
                 SecondaryQrScanConfig = secondaryQrScanConfig,
+                RawFormExtractionConfig = rawFormExtractionConfig,
                 ScannedSheetTemplateName = _scannedSheetTemplateName,
                 LoggingService = _loggingService
             };
@@ -588,6 +626,38 @@ namespace TestBookletProcessor.WPF
                     };
                 }
                 
+                // Load Raw Form Extraction Configuration
+                RawFormExtractionConfig? rawFormExtractionConfig = null;
+                var rawFormSection = _config?.GetSection("BookletProcessor:ScannedSheets:RawFormExtraction");
+                if (rawFormSection != null && rawFormSection.Exists())
+                {
+                    rawFormExtractionConfig = new RawFormExtractionConfig
+                    {
+                        Enabled = rawFormSection["Enabled"]?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? true,
+                        ExtractToSeparateFolder = rawFormSection["ExtractToSeparateFolder"]?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? false,
+                        ExtractionFolder = rawFormSection["ExtractionFolder"] ?? @"C:\TestBooklets\Output\RawForms",
+                        FileNameSuffix = rawFormSection["FileNameSuffix"] ?? "RawForm",
+                        IncludePageNumberInFileName = rawFormSection["IncludePageNumberInFileName"]?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? true,
+                        SkipRedRemoval = rawFormSection["SkipRedRemoval"]?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? true
+                    };
+
+                    var triggerQrSection = rawFormSection.GetSection("TriggerQrCodes");
+                    if (triggerQrSection != null)
+                    {
+                        rawFormExtractionConfig.TriggerQrCodes = triggerQrSection.GetChildren()
+                            .Select(c => c.Value ?? "")
+                            .Where(v => !string.IsNullOrEmpty(v))
+                            .ToList();
+                    }
+
+                    if (rawFormExtractionConfig.Enabled)
+                    {
+                        Console.WriteLine($"Raw form extraction enabled:");
+                        Console.WriteLine($"  Trigger QR codes: {string.Join(", ", rawFormExtractionConfig.TriggerQrCodes)}");
+                        Console.WriteLine($"  Skip red removal: {rawFormExtractionConfig.SkipRedRemoval}");
+                    }
+                }
+                
                 // Create scanned sheet processor
                 IScannedSheetProcessor? scannedSheetProcessor = null;
                 if (!string.IsNullOrEmpty(scannedSheetTemplateName))
@@ -607,7 +677,8 @@ namespace TestBookletProcessor.WPF
                         dpi,
                         qrValues,
                         redPixelExclusionRegions,
-                        secondaryQrScanConfig);
+                        secondaryQrScanConfig,
+                        rawFormExtractionConfig);
                 }
 
                 // Recreate the booklet processor with new settings
@@ -641,6 +712,70 @@ namespace TestBookletProcessor.WPF
             var jobsWindow = new FolderMonitorJobsWindow(_folderMonitorJobService);
             jobsWindow.Owner = this;
             jobsWindow.ShowDialog();
+        }
+        
+        private void OpenConfigFile_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");
+                
+                if (!File.Exists(configPath))
+                {
+                    MessageBox.Show(
+                        $"Configuration file not found at:\n{configPath}", 
+                        "File Not Found", 
+                        MessageBoxButton.OK, 
+                        MessageBoxImage.Warning);
+                    return;
+                }
+                
+                // Open with default JSON editor or Notepad
+                var processStartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = configPath,
+                    UseShellExecute = true
+                };
+                System.Diagnostics.Process.Start(processStartInfo);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Failed to open configuration file:\n{ex.Message}", 
+                    "Error", 
+                    MessageBoxButton.OK, 
+                    MessageBoxImage.Error);
+            }
+        }
+        
+        private void OpenConfigFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");
+                var folder = Path.GetDirectoryName(configPath);
+                
+                if (!Directory.Exists(folder))
+                {
+                    MessageBox.Show(
+                        $"Configuration folder not found at:\n{folder}", 
+                        "Folder Not Found", 
+                        MessageBoxButton.OK, 
+                        MessageBoxImage.Warning);
+                    return;
+                }
+                
+                // Open folder in Windows Explorer
+                System.Diagnostics.Process.Start("explorer.exe", folder!);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Failed to open configuration folder:\n{ex.Message}", 
+                    "Error", 
+                    MessageBoxButton.OK, 
+                    MessageBoxImage.Error);
+            }
         }
         
         protected override void OnClosed(EventArgs e)

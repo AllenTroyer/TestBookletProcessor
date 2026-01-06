@@ -327,6 +327,43 @@ partial class Program
             }
         }
 
+        // Load Raw Form Extraction Configuration
+        RawFormExtractionConfig? rawFormExtractionConfig = null;
+        var rawFormSection = config?.GetSection("BookletProcessor:ScannedSheets:RawFormExtraction");
+        if (rawFormSection != null && rawFormSection.Exists())
+        {
+            rawFormExtractionConfig = new RawFormExtractionConfig
+            {
+                Enabled = rawFormSection["Enabled"]?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? true,
+                ExtractToSeparateFolder = rawFormSection["ExtractToSeparateFolder"]?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? false,
+                ExtractionFolder = rawFormSection["ExtractionFolder"] ?? @"C:\TestBooklets\Output\RawForms",
+                FileNameSuffix = rawFormSection["FileNameSuffix"] ?? "RawForm",
+                IncludePageNumberInFileName = rawFormSection["IncludePageNumberInFileName"]?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? true,
+                SkipRedRemoval = rawFormSection["SkipRedRemoval"]?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? true
+            };
+
+            var triggerQrSection = rawFormSection.GetSection("TriggerQrCodes");
+            if (triggerQrSection != null)
+            {
+                rawFormExtractionConfig.TriggerQrCodes = triggerQrSection.GetChildren()
+                    .Select(c => c.Value ?? "")
+                    .Where(v => !string.IsNullOrEmpty(v))
+                    .ToList();
+            }
+
+            if (rawFormExtractionConfig.Enabled)
+            {
+                Console.WriteLine($"Raw form extraction enabled:");
+                Console.WriteLine($"  Trigger QR codes: {string.Join(", ", rawFormExtractionConfig.TriggerQrCodes)}");
+                Console.WriteLine($"  Suffix: {rawFormExtractionConfig.FileNameSuffix}");
+                Console.WriteLine($"  Skip red removal: {rawFormExtractionConfig.SkipRedRemoval}");
+                if (rawFormExtractionConfig.ExtractToSeparateFolder)
+                {
+                    Console.WriteLine($"  Extraction folder: {rawFormExtractionConfig.ExtractionFolder}");
+                }
+            }
+        }
+
         // Create scanned sheet processor if configured
         IScannedSheetProcessor? scannedSheetProcessor = null;
         if (!string.IsNullOrEmpty(scannedSheetTemplateName))
@@ -346,7 +383,8 @@ partial class Program
                 dpi,
                 qrValues,
                 redPixelExclusionRegions,
-                secondaryQrScanConfig);
+                secondaryQrScanConfig,
+                rawFormExtractionConfig);
         }
 
         var bookletProcessor = new BookletProcessorService(

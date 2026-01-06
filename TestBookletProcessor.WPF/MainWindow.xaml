@@ -8,6 +8,10 @@
                 <MenuItem Header="Preferences..." Click="OpenSettings_Click"/>
                 <MenuItem Header="Manage Folder Monitor Jobs..." Click="OpenFolderMonitorJobs_Click"/>
             </MenuItem>
+            <MenuItem Header="Help">
+                <MenuItem Header="Open Config File..." Click="OpenConfigFile_Click"/>
+                <MenuItem Header="Open Config Folder..." Click="OpenConfigFolder_Click"/>
+            </MenuItem>
         </Menu>
         <Grid Margin="20">
             <Grid.RowDefinitions>
