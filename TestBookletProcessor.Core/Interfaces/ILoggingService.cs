@@ -67,6 +67,19 @@ public interface ILoggingService
         string? processingMode = null);
     
     /// <summary>
+    /// Logs a non-fatal warning message.
+    /// </summary>
+    /// <param name="message">Description of the problem.</param>
+    Task LogWarningAsync(string message);
+
+    /// <summary>
+    /// Logs an error with optional full exception detail.
+    /// </summary>
+    /// <param name="message">Description of the error.</param>
+    /// <param name="exception">The exception, logged with stack trace when provided.</param>
+    Task LogErrorAsync(string message, Exception? exception = null);
+
+    /// <summary>
     /// Logs a custom log entry.
     /// </summary>
     /// <param name="entry">The log entry to write.</param>

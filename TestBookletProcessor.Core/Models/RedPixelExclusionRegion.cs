@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using TestBookletProcessor.Core.Utilities;
 
 namespace TestBookletProcessor.Core.Models;
 
@@ -67,31 +68,8 @@ public class RedPixelExclusionRegion
 
         foreach (var pattern in QrCodePatterns)
         {
-            if (MatchesPattern(qrCode, pattern))
+            if (WildcardMatcher.Matches(qrCode, pattern))
                 return true;
-        }
-
-        return false;
-    }
-
-    private static bool MatchesPattern(string value, string pattern)
-    {
-        if (string.IsNullOrEmpty(pattern))
-            return false;
-
-        // Exact match
-        if (value.Equals(pattern, StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        // Wildcard match
-        if (pattern.Contains('*'))
-        {
-            var regexPattern = "^" + System.Text.RegularExpressions.Regex.Escape(pattern)
-                .Replace("\\*", ".*") + "$";
-            return System.Text.RegularExpressions.Regex.IsMatch(
-                value, 
-                regexPattern, 
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         }
 
         return false;

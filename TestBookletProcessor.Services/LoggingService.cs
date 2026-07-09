@@ -158,11 +158,39 @@ public class LoggingService : ILoggingService
     }
     
     /// <inheritdoc/>
+    public async Task LogWarningAsync(string message)
+    {
+        await LogEntryAsync(new LogEntry
+        {
+            EntryType = LogEntryType.Warning,
+            ErrorMessage = message
+        });
+    }
+
+    /// <inheritdoc/>
+    public async Task LogErrorAsync(string message, Exception? exception = null)
+    {
+        await LogEntryAsync(new LogEntry
+        {
+            EntryType = LogEntryType.Error,
+            ErrorMessage = exception == null ? message : $"{message} | {exception}"
+        });
+    }
+
+    /// <inheritdoc/>
     public async Task LogEntryAsync(LogEntry entry)
     {
         await _writeLock.WaitAsync();
         try
         {
+            // Roll over to a new file when the date changes (the app can run for days)
+            var expectedPath = GetLogFilePath();
+            if (!string.Equals(expectedPath, _currentLogFilePath, StringComparison.OrdinalIgnoreCase))
+            {
+                _currentLogFilePath = expectedPath;
+                _headerWritten = File.Exists(expectedPath);
+            }
+
             // Check for log rotation
             if (_config.EnableLogRotation && File.Exists(_currentLogFilePath))
             {

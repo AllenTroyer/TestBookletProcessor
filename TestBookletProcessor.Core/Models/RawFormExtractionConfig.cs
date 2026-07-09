@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using TestBookletProcessor.Core.Utilities;
 
 namespace TestBookletProcessor.Core.Models;
 
@@ -17,7 +18,7 @@ public class RawFormExtractionConfig
     /// Gets or sets the list of QR code values that trigger extraction.
     /// Pages with these primary QR codes will be saved as separate files.
     /// </summary>
-    public List<string> TriggerQrCodes { get; set; } = new() { "RAWFORMQR-01", "RAWFORMQR-02" };
+    public List<string> TriggerQrCodes { get; set; } = new();
 
     /// <summary>
     /// Gets or sets whether to extract files to a separate dedicated folder.
@@ -29,7 +30,7 @@ public class RawFormExtractionConfig
     /// Gets or sets the folder path where extracted files will be saved.
     /// Only used if ExtractToSeparateFolder is true.
     /// </summary>
-    public string ExtractionFolder { get; set; } = @"C:\TestBooklets\Output\RawForms";
+    public string ExtractionFolder { get; set; } = "";
 
     /// <summary>
     /// Gets or sets the suffix to add to extracted filenames.
@@ -63,25 +64,10 @@ public class RawFormExtractionConfig
 
         foreach (var pattern in TriggerQrCodes)
         {
-            if (MatchesWildcard(qrCode, pattern, ignoreCase: true))
+            if (WildcardMatcher.Matches(qrCode, pattern))
                 return true;
         }
 
         return false;
-    }
-
-    private static bool MatchesWildcard(string value, string pattern, bool ignoreCase = true)
-    {
-        if (string.IsNullOrEmpty(pattern))
-            return false;
-
-        var regexPattern = "^" + System.Text.RegularExpressions.Regex.Escape(pattern)
-            .Replace("\\*", ".*") + "$";
-
-        var options = ignoreCase
-            ? System.Text.RegularExpressions.RegexOptions.IgnoreCase
-            : System.Text.RegularExpressions.RegexOptions.None;
-
-        return System.Text.RegularExpressions.Regex.IsMatch(value, regexPattern, options);
     }
 }

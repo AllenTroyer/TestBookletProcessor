@@ -1,10 +1,7 @@
-﻿using Microsoft.Extensions.Configuration;
 using QrRegionScanner;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using TestBookletProcessor.Core.Interfaces;
@@ -14,21 +11,18 @@ using TestBookletProcessor.Services;
 partial class Program
 {
     private static ILoggingService? _loggingService;
-    
+
     static async Task Main(string[] args)
     {
-        // Initialize logging service
-        var config = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-            .Build();
-        
-        _loggingService = CreateLoggingService(config);
-        
+        Console.WriteLine($"Using configuration file: {AppConfig.ConfigFilePath}");
+        var appOptions = AppConfig.Load();
+
+        _loggingService = new LoggingService(appOptions.Logging);
+
         // Log application start
         var appVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString();
         await _loggingService.LogApplicationStartAsync(appVersion);
-        
+
         Console.WriteLine("=== Test Booklet Processor Console ===");
         Console.WriteLine("Select test mode:");
         Console.WriteLine("1. QR Code Scanner Test");
@@ -43,52 +37,15 @@ partial class Program
         }
         else if (choice == "2")
         {
-            await TestBookletProcessing();
+            await TestBookletProcessing(appOptions.BookletProcessor);
         }
         else
         {
             Console.WriteLine("Invalid choice. Exiting.");
         }
-        
+
         // Log application stop
         await _loggingService.LogApplicationStopAsync();
-    }
-
-    static ILoggingService CreateLoggingService(IConfigurationRoot config)
-    {
-        var loggingConfig = new LoggingServiceConfig();
-        
-        var logDir = config["Logging:LogDirectory"];
-        if (!string.IsNullOrWhiteSpace(logDir))
-        {
-            loggingConfig.LogDirectory = logDir;
-        }
-        
-        var format = config["Logging:Format"];
-        if (Enum.TryParse<LogFormat>(format, true, out var logFormat))
-        {
-            loggingConfig.Format = logFormat;
-        }
-        
-        var enableRotation = config["Logging:EnableLogRotation"];
-        if (bool.TryParse(enableRotation, out var rotation))
-        {
-            loggingConfig.EnableLogRotation = rotation;
-        }
-        
-        var maxSize = config["Logging:MaxLogFileSizeBytes"];
-        if (long.TryParse(maxSize, out var size))
-        {
-            loggingConfig.MaxLogFileSizeBytes = size;
-        }
-        
-        var maxFiles = config["Logging:MaxLogFiles"];
-        if (int.TryParse(maxFiles, out var files))
-        {
-            loggingConfig.MaxLogFiles = files;
-        }
-        
-        return new LoggingService(loggingConfig);
     }
 
     static async Task TestQrCodeScanner()
@@ -168,16 +125,10 @@ partial class Program
         Console.ReadKey();
     }
 
-    static async Task TestBookletProcessing()
+    static async Task TestBookletProcessing(BookletProcessorOptions options)
     {
         Console.WriteLine("\n=== Booklet Processing Test ===");
         var stopwatch = Stopwatch.StartNew();
-
-        // Load configuration from appsettings.json
-        var config = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-            .Build();
 
         // Paths for testing
         // To test Scanned Sheet Mode: use Template_ScannedSheets.pdf
@@ -189,223 +140,36 @@ partial class Program
         // Ensure output folder exists
         Directory.CreateDirectory(outputFolder);
 
-        // Read settings from appsettings.json
-        var redThresholdStr = config?["BookletProcessor:RedPixelThreshold"];
-        byte redPixelThreshold = byte.TryParse(redThresholdStr, out var thresholdVal) ? thresholdVal : (byte)200;
-
-        var enableRedStr = config?["BookletProcessor:EnableRedPixelRemover"];
-        bool enableRedPixelRemover = enableRedStr != null && enableRedStr.Equals("true", StringComparison.OrdinalIgnoreCase);
-
-        var dpiStr = config?["BookletProcessor:DefaultDpi"];
-        int dpi = int.TryParse(dpiStr, out var dpiVal) ? dpiVal : 300;
-
-        // Load QR scanner configuration
-        var enableQrStr = config?["BookletProcessor:QrScanner:EnableQrScanning"];
-        bool enableQrScanning = enableQrStr != null && enableQrStr.Equals("true", StringComparison.OrdinalIgnoreCase);
-
-        double qrXInches = double.TryParse(config?["BookletProcessor:QrScanner:QrRegionXInches"], out var xi) ? xi : 6.5;
-        double qrYInches = double.TryParse(config?["BookletProcessor:QrScanner:QrRegionYInches"], out var yi) ? yi : 9.0;
-        double qrWidthInches = double.TryParse(config?["BookletProcessor:QrScanner:QrRegionWidthInches"], out var wi) ? wi : 2.0;
-        double qrHeightInches = double.TryParse(config?["BookletProcessor:QrScanner:QrRegionHeightInches"], out var hi) ? hi : 2.0;
-
-        var qrValuesSection = config?.GetSection("BookletProcessor:QrScanner:QrValuesExcludingRedRemoval");
-        var qrValues = qrValuesSection?.GetChildren().Select(c => c.Value ?? "").ToList() ??
-                      new List<string> { "MACHINE_SCORED", "NO_RED_INK", "CLEAN" };
-
-        // Load Template Exclusion Patterns
-        var templateExclusionSection = config?.GetSection("BookletProcessor:TemplateExclusionPatterns");
-        var templateExclusionPatterns = templateExclusionSection?.GetChildren().Select(c => c.Value ?? "").ToList() ??
-                      new List<string> { "*BLANK*", "*SAMPLE*" };
-
-        Console.WriteLine($"Red pixel remover enabled: {enableRedPixelRemover}");
-        Console.WriteLine($"Red pixel threshold: {redPixelThreshold}");
-        Console.WriteLine($"DPI: {dpi}");
-        Console.WriteLine($"QR scanning enabled: {enableQrScanning}");
-        if (enableQrScanning)
+        Console.WriteLine($"Red pixel remover enabled: {options.EnableRedPixelRemover}");
+        Console.WriteLine($"Red pixel threshold: {options.RedPixelThreshold}");
+        Console.WriteLine($"DPI: {options.DefaultDpi}");
+        Console.WriteLine($"QR scanning enabled: {options.QrScanner.EnableQrScanning}");
+        if (options.QrScanner.EnableQrScanning)
         {
-            Console.WriteLine($"QR region (inches): X={qrXInches:F2}, Y={qrYInches:F2}, Width={qrWidthInches:F2}, Height={qrHeightInches:F2}");
-            Console.WriteLine($"QR region (pixels @ {dpi} DPI): X={qrXInches * dpi:F0}, Y={qrYInches * dpi:F0}, Width={qrWidthInches * dpi:F0}, Height={qrHeightInches * dpi:F0}");
-            Console.WriteLine($"QR values excluding red removal: {string.Join(", ", qrValues)}");
+            var qr = options.QrScanner;
+            var dpi = options.DefaultDpi;
+            Console.WriteLine($"QR region (inches): X={qr.QrRegionXInches:F2}, Y={qr.QrRegionYInches:F2}, Width={qr.QrRegionWidthInches:F2}, Height={qr.QrRegionHeightInches:F2}");
+            Console.WriteLine($"QR region (pixels @ {dpi} DPI): X={qr.QrRegionXInches * dpi:F0}, Y={qr.QrRegionYInches * dpi:F0}, Width={qr.QrRegionWidthInches * dpi:F0}, Height={qr.QrRegionHeightInches * dpi:F0}");
+            Console.WriteLine($"QR values excluding red removal: {string.Join(", ", qr.QrValuesExcludingRedRemoval)}");
         }
-        Console.WriteLine($"Template exclusion patterns: {string.Join(", ", templateExclusionPatterns)}");
+        Console.WriteLine($"Template exclusion patterns: {string.Join(", ", options.TemplateExclusionPatterns)}");
 
-        // Load Scanned Sheet Configuration
-        var scannedSheetTemplateName = config?["BookletProcessor:ScannedSheets:TemplateName"];
-        var scannedSheetQrMappingSection = config?.GetSection("BookletProcessor:ScannedSheets:QrToPageMapping");
-        var scannedSheetQrMapping = new Dictionary<string, int>();
-        if (scannedSheetQrMappingSection != null)
+        if (!string.IsNullOrEmpty(options.ScannedSheets.TemplateName))
         {
-            foreach (var child in scannedSheetQrMappingSection.GetChildren())
-            {
-                if (child.Key != null && int.TryParse(child.Value, out var pageIndex))
-                {
-                    scannedSheetQrMapping[child.Key] = pageIndex;
-                }
-            }
+            Console.WriteLine($"Scanned sheet template: {options.ScannedSheets.TemplateName}");
+            Console.WriteLine($"Scanned sheet QR mappings: {options.ScannedSheets.QrToPageMapping.Count} patterns");
         }
 
-        if (!string.IsNullOrEmpty(scannedSheetTemplateName))
+        if (options.RedPixelExclusionRegions.Count > 0)
         {
-            Console.WriteLine($"Scanned sheet template: {scannedSheetTemplateName}");
-            Console.WriteLine($"Scanned sheet QR mappings: {scannedSheetQrMapping.Count} patterns");
-        }
-
-        // Create service instances
-        IPdfService pdfService = new PdfService();
-        IDeskewer deskewer = new Deskewer();
-        IImageAligner aligner = new ImageAlignerAlt();
-        IRedPixelRemoverService redPixelRemover = new RedPixelRemoverService();
-        RegionQrScanner qrScanner = new RegionQrScanner();
-
-        // Load Red Pixel Exclusion Regions
-        var exclusionRegionsSection = config?.GetSection("BookletProcessor:RedPixelExclusionRegions");
-        var redPixelExclusionRegions = new List<RedPixelExclusionRegion>();
-        if (exclusionRegionsSection != null)
-        {
-            foreach (var child in exclusionRegionsSection.GetChildren())
-            {
-                var region = new RedPixelExclusionRegion
-                {
-                    Name = child["Name"] ?? "",
-                    XInches = double.TryParse(child["XInches"], out var x) ? x : 0,
-                    YInches = double.TryParse(child["YInches"], out var y) ? y : 0,
-                    WidthInches = double.TryParse(child["WidthInches"], out var w) ? w : 0,
-                    HeightInches = double.TryParse(child["HeightInches"], out var h) ? h : 0
-                };
-
-                var patternsSection = child.GetSection("QrCodePatterns");
-                if (patternsSection != null)
-                {
-                    region.QrCodePatterns = patternsSection.GetChildren()
-                        .Select(c => c.Value ?? "")
-                        .Where(v => !string.IsNullOrEmpty(v))
-                        .ToList();
-                }
-
-                if (region.QrCodePatterns.Any())
-                {
-                    redPixelExclusionRegions.Add(region);
-                }
-            }
-        }
-
-        if (redPixelExclusionRegions.Any())
-        {
-            Console.WriteLine($"Red pixel exclusion regions: {redPixelExclusionRegions.Count} region(s)");
-            foreach (var region in redPixelExclusionRegions)
+            Console.WriteLine($"Red pixel exclusion regions: {options.RedPixelExclusionRegions.Count} region(s)");
+            foreach (var region in options.RedPixelExclusionRegions)
             {
                 Console.WriteLine($"  - {region.Name}: QR patterns: {string.Join(", ", region.QrCodePatterns)}");
             }
         }
 
-        // Load Secondary QR Scan Configuration
-        SecondaryQrScanConfig? secondaryQrScanConfig = null;
-        var secondaryQrSection = config?.GetSection("BookletProcessor:ScannedSheets:SecondaryQrScan");
-        if (secondaryQrSection != null && secondaryQrSection.Exists())
-        {
-            secondaryQrScanConfig = new SecondaryQrScanConfig
-            {
-                TriggerQrCode = secondaryQrSection["TriggerQrCode"] ?? "CHECKLISTQR-01",
-                RegionXInches = double.TryParse(secondaryQrSection["RegionXInches"], out var sx) ? sx : 0.0,
-                RegionYInches = double.TryParse(secondaryQrSection["RegionYInches"], out var sy) ? sy : 0.75,
-                RegionWidthInches = double.TryParse(secondaryQrSection["RegionWidthInches"], out var sw) ? sw : 2.0,
-                RegionHeightInches = double.TryParse(secondaryQrSection["RegionHeightInches"], out var sh) ? sh : 1.0,
-                FileNameReplacementPattern = secondaryQrSection["FileNameReplacementPattern"] ?? "SchoolCityState",
-                RenameInputFiles = secondaryQrSection["RenameInputFiles"]?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? true,
-                ArchiveFolder = secondaryQrSection["ArchiveFolder"] ?? @"C:\Users\allen\Dropbox\Data\Catforms\Scans\TestScans\ToArchive"
-            };
-
-            Console.WriteLine($"Secondary QR scan configured:");
-            Console.WriteLine($"  Trigger QR: {secondaryQrScanConfig.TriggerQrCode}");
-            Console.WriteLine($"  Region: ({secondaryQrScanConfig.RegionXInches}\", {secondaryQrScanConfig.RegionYInches}\") " +
-                              $"{secondaryQrScanConfig.RegionWidthInches}\" � {secondaryQrScanConfig.RegionHeightInches}\"");
-            Console.WriteLine($"  Replacement pattern: {secondaryQrScanConfig.FileNameReplacementPattern}");
-            Console.WriteLine($"  Rename input files: {secondaryQrScanConfig.RenameInputFiles}");
-            if (secondaryQrScanConfig.RenameInputFiles)
-            {
-                Console.WriteLine($"  Archive folder: {secondaryQrScanConfig.ArchiveFolder}");
-            }
-        }
-
-        // Load Raw Form Extraction Configuration
-        RawFormExtractionConfig? rawFormExtractionConfig = null;
-        var rawFormSection = config?.GetSection("BookletProcessor:ScannedSheets:RawFormExtraction");
-        if (rawFormSection != null && rawFormSection.Exists())
-        {
-            rawFormExtractionConfig = new RawFormExtractionConfig
-            {
-                Enabled = rawFormSection["Enabled"]?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? true,
-                ExtractToSeparateFolder = rawFormSection["ExtractToSeparateFolder"]?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? false,
-                ExtractionFolder = rawFormSection["ExtractionFolder"] ?? @"C:\TestBooklets\Output\RawForms",
-                FileNameSuffix = rawFormSection["FileNameSuffix"] ?? "RawForm",
-                IncludePageNumberInFileName = rawFormSection["IncludePageNumberInFileName"]?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? true,
-                SkipRedRemoval = rawFormSection["SkipRedRemoval"]?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? true
-            };
-
-            var triggerQrSection = rawFormSection.GetSection("TriggerQrCodes");
-            if (triggerQrSection != null)
-            {
-                rawFormExtractionConfig.TriggerQrCodes = triggerQrSection.GetChildren()
-                    .Select(c => c.Value ?? "")
-                    .Where(v => !string.IsNullOrEmpty(v))
-                    .ToList();
-            }
-
-            if (rawFormExtractionConfig.Enabled)
-            {
-                Console.WriteLine($"Raw form extraction enabled:");
-                Console.WriteLine($"  Trigger QR codes: {string.Join(", ", rawFormExtractionConfig.TriggerQrCodes)}");
-                Console.WriteLine($"  Suffix: {rawFormExtractionConfig.FileNameSuffix}");
-                Console.WriteLine($"  Skip red removal: {rawFormExtractionConfig.SkipRedRemoval}");
-                if (rawFormExtractionConfig.ExtractToSeparateFolder)
-                {
-                    Console.WriteLine($"  Extraction folder: {rawFormExtractionConfig.ExtractionFolder}");
-                }
-            }
-        }
-
-        // Create scanned sheet processor if configured
-        IScannedSheetProcessor? scannedSheetProcessor = null;
-        if (!string.IsNullOrEmpty(scannedSheetTemplateName))
-        {
-            scannedSheetProcessor = new ScannedSheetProcessorService(
-                pdfService,
-                deskewer,
-                aligner,
-                enableRedPixelRemover ? redPixelRemover : null,
-                redPixelThreshold,
-                enableQrScanning ? qrScanner : null,
-                enableQrScanning,
-                qrXInches,
-                qrYInches,
-                qrWidthInches,
-                qrHeightInches,
-                dpi,
-                qrValues,
-                redPixelExclusionRegions,
-                secondaryQrScanConfig,
-                rawFormExtractionConfig);
-        }
-
-        var bookletProcessor = new BookletProcessorService(
-        pdfService,
-        deskewer,
-        aligner,
-        enableRedPixelRemover ? redPixelRemover : null,
-        redPixelThreshold,
-        dpi,
-        enableQrScanning ? qrScanner : null,
-        enableQrScanning,
-        qrXInches,
-        qrYInches,
-        qrWidthInches,
-        qrHeightInches,
-        qrValues,
-        templateExclusionPatterns,
-        scannedSheetProcessor,
-        scannedSheetTemplateName,
-        scannedSheetQrMapping
-        );
+        var bookletProcessor = ProcessorFactory.CreateBookletProcessor(options, _loggingService);
 
         // Create job for logging
         var job = new ProcessingJob
@@ -413,21 +177,21 @@ partial class Program
             InputFilePath = inputPdf,
             TemplateFilePath = templatePdf,
             OutputFolder = outputFolder,
-            Status = ProcessingJobStatus.Processing
+            Status = ProcessingJobStatus.Processing,
+            StartedTime = DateTime.Now
         };
-        
-        job.StartedTime = DateTime.Now;
-        
+
         // Determine processing mode
-        string processingMode = (!string.IsNullOrEmpty(scannedSheetTemplateName) && 
-                                Path.GetFileName(templatePdf).Equals(scannedSheetTemplateName, StringComparison.OrdinalIgnoreCase))
+        string processingMode = (!string.IsNullOrEmpty(options.ScannedSheets.TemplateName) &&
+                                Path.GetFileName(templatePdf).Equals(options.ScannedSheets.TemplateName, StringComparison.OrdinalIgnoreCase))
             ? "ScannedSheets"
             : "Booklet";
-        
+
         // Log job started
         if (_loggingService != null)
         {
-            await _loggingService.LogJobStartedAsync(job, dpi, enableRedPixelRemover, enableQrScanning, processingMode);
+            await _loggingService.LogJobStartedAsync(job, options.DefaultDpi, options.EnableRedPixelRemover,
+                options.QrScanner.EnableQrScanning, processingMode);
         }
 
         try
@@ -449,11 +213,13 @@ partial class Program
             {
                 if (result.Success)
                 {
-                    await _loggingService.LogJobCompletedAsync(job, dpi, enableRedPixelRemover, enableQrScanning, processingMode);
+                    await _loggingService.LogJobCompletedAsync(job, options.DefaultDpi, options.EnableRedPixelRemover,
+                        options.QrScanner.EnableQrScanning, processingMode);
                 }
                 else
                 {
-                    await _loggingService.LogJobFailedAsync(job, dpi, enableRedPixelRemover, enableQrScanning, processingMode);
+                    await _loggingService.LogJobFailedAsync(job, options.DefaultDpi, options.EnableRedPixelRemover,
+                        options.QrScanner.EnableQrScanning, processingMode);
                 }
             }
 
@@ -462,6 +228,10 @@ partial class Program
                 Console.WriteLine("Test completed successfully.");
                 Console.WriteLine($"Output: {result.OutputPath}");
                 Console.WriteLine($"Pages processed: {result.PagesProcessed}");
+                foreach (var warning in result.Warnings)
+                {
+                    Console.WriteLine($"WARNING: {warning}");
+                }
             }
             else
             {
@@ -473,14 +243,15 @@ partial class Program
             job.Status = ProcessingJobStatus.Failed;
             job.ErrorMessage = ex.Message;
             job.CompletedTime = DateTime.Now;
-            
+
             // Log job failed
             if (_loggingService != null)
             {
-                await _loggingService.LogJobFailedAsync(job, dpi, enableRedPixelRemover, enableQrScanning, processingMode);
+                await _loggingService.LogJobFailedAsync(job, options.DefaultDpi, options.EnableRedPixelRemover,
+                    options.QrScanner.EnableQrScanning, processingMode);
             }
-            
-            Console.WriteLine($"Test failed: {ex.Message}");
+
+            Console.WriteLine($"Test failed: {ex}");
         }
 
         stopwatch.Stop();

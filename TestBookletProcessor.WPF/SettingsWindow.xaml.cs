@@ -1,6 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
-using Microsoft.Win32;
-using Microsoft.WindowsAPICodePack.Dialogs;
+﻿using Microsoft.WindowsAPICodePack.Dialogs;
 using Newtonsoft.Json.Linq;
 using System;
 using System.IO;
@@ -9,18 +7,18 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using TestBookletProcessor.Services;
 
 namespace TestBookletProcessor.WPF
 {
     public partial class SettingsWindow : Window
     {
-        private readonly string _configPath = "appsettings.json";
-        private JObject _configJson;
+        private readonly string _configPath = AppConfig.ConfigFilePath;
+        private JObject _configJson = new();
 
         public SettingsWindow()
         {
             InitializeComponent();
-            //Topmost = true;
             LoadSettings();
         }
 
@@ -106,7 +104,6 @@ namespace TestBookletProcessor.WPF
             }
             else
             {
-                _configJson = new JObject();
                 DefaultDpiTextBox.Text = "300";
                 EnableRedPixelRemoverCheckBox.IsChecked = true;
                 RedPixelThresholdTextBox.Text = "200";

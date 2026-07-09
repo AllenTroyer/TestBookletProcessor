@@ -14,9 +14,9 @@ namespace TestBookletProcessor.Core.Interfaces
 
  public class FolderFileDetectedEventArgs : EventArgs
  {
- public string FolderPath { get; set; }
- public string FilePath { get; set; }
- public string TemplateFilePath { get; set; }
- public string OutputFolder { get; set; }
+ public string FolderPath { get; set; } = "";
+ public string FilePath { get; set; } = "";
+ public string TemplateFilePath { get; set; } = "";
+ public string OutputFolder { get; set; } = "";
  }
 }

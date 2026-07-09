@@ -1,9 +1,11 @@
-﻿using System.Collections.ObjectModel;
+﻿using System;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
 using Microsoft.Win32;
 using TestBookletProcessor.Core.Interfaces;
 using TestBookletProcessor.Core.Models;
+using TestBookletProcessor.Services;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using System.IO;
 using Newtonsoft.Json.Linq;
@@ -14,7 +16,7 @@ namespace TestBookletProcessor.WPF
  {
  private readonly IFolderMonitorJobService _jobService;
  public ObservableCollection<FolderMonitorJobConfig> Jobs { get; } = new();
- private JObject _configJson;
+ private JObject _configJson = new();
 
  public FolderMonitorJobsWindow(IFolderMonitorJobService jobService)
  {
@@ -27,15 +29,17 @@ namespace TestBookletProcessor.WPF
 
  private void LoadConfig()
  {
- var configPath = "appsettings.json";
+ var configPath = AppConfig.ConfigFilePath;
  if (File.Exists(configPath))
  {
- var json = File.ReadAllText(configPath);
- _configJson = JObject.Parse(json);
- }
- else
+ try
  {
- _configJson = new JObject();
+ _configJson = JObject.Parse(File.ReadAllText(configPath));
+ }
+ catch
+ {
+ // Defaults are only used for browse-dialog starting folders
+ }
  }
  }
 
@@ -115,7 +119,15 @@ namespace TestBookletProcessor.WPF
  MessageBox.Show("A job for this folder already exists.", "Duplicate Folder", MessageBoxButton.OK, MessageBoxImage.Warning);
  return;
  }
+ try
+ {
  _jobService.AddJob(folder, template, output);
+ }
+ catch (Exception ex)
+ {
+ MessageBox.Show(ex.Message, "Cannot Monitor Folder", MessageBoxButton.OK, MessageBoxImage.Warning);
+ return;
+ }
  Jobs.Add(new FolderMonitorJobConfig { FolderPath = folder, TemplateFilePath = template, OutputFolder = output });
  }
 

@@ -44,10 +44,20 @@ public class RegionQrScanner
 
     /// <summary>
     /// Scans a specific region of an SKBitmap for a QR code.
+    /// The region is clamped to the bitmap bounds, since scanned pages are frequently a few
+    /// pixels smaller than nominal; a region entirely outside the image returns null.
     /// </summary>
     public string? ScanRegion(SKBitmap bitmap, int x, int y, int width, int height)
     {
-        ValidateRegion(bitmap, x, y, width, height);
+        if (width <= 0 || height <= 0)
+            throw new ArgumentException("Region dimensions must be positive");
+
+        x = Math.Max(0, x);
+        y = Math.Max(0, y);
+        width = Math.Min(width, bitmap.Width - x);
+        height = Math.Min(height, bitmap.Height - y);
+        if (width <= 0 || height <= 0)
+            return null;
 
         // Extract the region
         using var croppedBitmap = new SKBitmap(width, height);
@@ -71,14 +81,5 @@ public class RegionQrScanner
 
         var result = reader.Decode(croppedBitmap);
         return result?.Text;
-    }
-
-    private static void ValidateRegion(SKBitmap bitmap, int x, int y, int width, int height)
-    {
-        if (x < 0 || y < 0 || width <= 0 || height <= 0)
-            throw new ArgumentException("Region coordinates must be positive");
-
-        if (x + width > bitmap.Width || y + height > bitmap.Height)
-            throw new ArgumentException("Region extends beyond image boundaries");
     }
 }

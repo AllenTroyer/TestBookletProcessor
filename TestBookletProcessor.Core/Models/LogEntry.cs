@@ -30,7 +30,17 @@ public enum LogEntryType
     /// <summary>
     /// Job failed with an error.
     /// </summary>
-    JobFailed
+    JobFailed,
+
+    /// <summary>
+    /// Non-fatal problem (e.g., a page that could not be aligned).
+    /// </summary>
+    Warning,
+
+    /// <summary>
+    /// Error outside the context of a specific job, or diagnostic detail for a failure.
+    /// </summary>
+    Error
 }
 
 /// <summary>

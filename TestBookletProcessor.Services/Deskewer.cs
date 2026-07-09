@@ -52,7 +52,9 @@ namespace TestBookletProcessor.Services
  if (angle < -45) angle +=90;
 
  // Step9: Deskew Angle Threshold
- // Definition: Only deskew if the detected angle is significant (greater than2 degrees).
+ // Definition: Only correct small skews (2 degrees or less). Larger detected angles are far
+ // more likely to be a misdetected contour than a genuinely rotated scan, so they are
+ // ignored here and left for template alignment to handle.
  if (Math.Abs(angle) >2) angle =0;
  double deskewAngle = angle;
 

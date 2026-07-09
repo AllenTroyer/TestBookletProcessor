@@ -40,13 +40,14 @@ public class SecondaryQrScanConfig
     
     /// <summary>
     /// Gets or sets whether to rename and move the input file to the archive folder.
+    /// Requires <see cref="ArchiveFolder"/> to be set.
     /// </summary>
-    public bool RenameInputFiles { get; set; } = true;
-    
+    public bool RenameInputFiles { get; set; }
+
     /// <summary>
     /// Gets or sets the folder path where renamed input files will be moved.
     /// </summary>
-    public string ArchiveFolder { get; set; } = @"C:\Users\allen\Dropbox\Data\Catforms\Scans\TestScans\ToArchive";
+    public string ArchiveFolder { get; set; } = "";
 
     /// <summary>
     /// Converts the inch-based region dimensions to pixel coordinates based on DPI.

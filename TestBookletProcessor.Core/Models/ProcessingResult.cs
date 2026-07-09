@@ -35,27 +35,13 @@ namespace TestBookletProcessor.Core.Models
         /// Gets or sets the processing time elapsed.
         /// </summary>
         public TimeSpan ProcessingTime { get; set; }
-        
+
         /// <summary>
-        /// Gets or sets the processing mode used (e.g., "Booklet", "ScannedSheets").
+        /// Gets the non-fatal problems encountered while processing (e.g., pages that
+        /// could not be aligned and were passed through unmodified).
         /// </summary>
-        public string? ProcessingMode { get; set; }
-        
-        /// <summary>
-        /// Gets or sets the DPI setting used for processing.
-        /// </summary>
-        public int? Dpi { get; set; }
-        
-        /// <summary>
-        /// Gets or sets whether red pixel removal was enabled.
-        /// </summary>
-        public bool? RedPixelRemovalEnabled { get; set; }
-        
-        /// <summary>
-        /// Gets or sets whether QR scanning was enabled.
-        /// </summary>
-        public bool? QrScanningEnabled { get; set; }
-        
+        public List<string> Warnings { get; } = new();
+
         /// <summary>
         /// Gets or sets the list of extracted file paths (e.g., raw forms).
         /// Used in scanned sheet processing when sheets are extracted as separate files.

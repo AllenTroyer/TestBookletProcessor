@@ -11,6 +11,5 @@ namespace TestBookletProcessor.Core.Interfaces
         Task ConvertPageToImageAsync(string pdfPath, int pageNumber, string outputImagePath, int dpi = 300);
         Task ConvertImageToPdfAsync(string imagePath, string outputPath);
         Task<List<string>> SplitIntoBookletsAsync(string inputPdfPath, string templatePdfPath, string outputFolder);
-        static void CleanupDirectory(string path) { }
     }
 }

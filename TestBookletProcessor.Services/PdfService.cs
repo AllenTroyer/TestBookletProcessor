@@ -18,6 +18,13 @@ namespace TestBookletProcessor.Services;
 
 public class PdfService : IPdfService
 {
+    /// <summary>
+    /// Docnet wraps PDFium, which is not thread-safe, and DocLib.Instance is a process-wide
+    /// singleton — so all rendering must be serialized even though jobs run concurrently
+    /// with otherwise isolated service instances.
+    /// </summary>
+    private static readonly object PdfiumLock = new();
+
     public async Task<List<string>> SplitPdfAsync(string inputPath, string outputFolder)
     {
         return await Task.Run(() =>
@@ -104,41 +111,24 @@ public class PdfService : IPdfService
             int pageWidthPixels = (int)(8.5 * dpi);
             int pageHeightPixels = (int)(11 * dpi);
 
-            using (var docReader = DocLib.Instance.GetDocReader(pdfPath, new PageDimensions(pageWidthPixels, pageHeightPixels)))
+            byte[] rawBytes;
+            int pageWidth, pageHeight;
+            lock (PdfiumLock)
             {
-                using (var pageReader = docReader.GetPageReader(pageNumber - 1))
-                {
-                    int pageWidth = pageReader.GetPageWidth();
-                    int pageHeight = pageReader.GetPageHeight();
-                    var rawBytes = pageReader.GetImage();
+                using var docReader = DocLib.Instance.GetDocReader(pdfPath, new PageDimensions(pageWidthPixels, pageHeightPixels));
+                using var pageReader = docReader.GetPageReader(pageNumber - 1);
+                pageWidth = pageReader.GetPageWidth();
+                pageHeight = pageReader.GetPageHeight();
+                rawBytes = pageReader.GetImage();
+            }
 
-                    using (var image = new SixLabors.ImageSharp.Image<Rgba32>(pageWidth, pageHeight))
-                    {
-                        // Set DPI metadata
-                        image.Metadata.HorizontalResolution = dpi;
-                        image.Metadata.VerticalResolution = dpi;
-                        image.Metadata.ResolutionUnits = PixelResolutionUnit.PixelsPerInch;
-
-                        image.ProcessPixelRows(accessor =>
-                        {
-                            for (int y = 0; y < pageHeight; y++)
-                            {
-                                var rowSpan = accessor.GetRowSpan(y);
-                                int offset = y * pageWidth * 4;
-                                for (int x = 0; x < pageWidth; x++)
-                                {
-                                    int idx = offset + x * 4;
-                                    byte b = rawBytes[idx + 0];
-                                    byte g = rawBytes[idx + 1];
-                                    byte r = rawBytes[idx + 2];
-                                    byte a = rawBytes[idx + 3];
-                                    rowSpan[x] = new Rgba32(r, g, b, a);
-                                }
-                            }
-                        });
-                        image.Save(outputImagePath, new PngEncoder());
-                    }
-                }
+            // Docnet returns BGRA bytes, which is a pixel layout ImageSharp can load directly
+            using (var image = SixLabors.ImageSharp.Image.LoadPixelData<Bgra32>(rawBytes, pageWidth, pageHeight))
+            {
+                image.Metadata.HorizontalResolution = dpi;
+                image.Metadata.VerticalResolution = dpi;
+                image.Metadata.ResolutionUnits = PixelResolutionUnit.PixelsPerInch;
+                image.Save(outputImagePath, new PngEncoder());
             }
             Console.WriteLine($"Converted page {pageNumber} to image: {outputImagePath}");
         });
@@ -263,29 +253,6 @@ public class PdfService : IPdfService
                 }
             }
         }
-    }
-
-    public async Task ProcessBookletsAsync(
-        string inputPdfPath,
-        string templatePdfPath,
-        string workingFolder,
-        string finalOutputPdf,
-        Func<string, Task<string>> processBookletAsync)
-    {
-        // 1. Split input PDF into booklets
-        var bookletFiles = await SplitIntoBookletsAsync(inputPdfPath, templatePdfPath, workingFolder);
-
-        // 2. Process each booklet file
-        var processedBookletFiles = new List<string>();
-        foreach (var bookletFile in bookletFiles)
-        {
-            // The delegate should process the booklet and return the path to the processed file
-            string processedFile = await processBookletAsync(bookletFile);
-            processedBookletFiles.Add(processedFile);
-        }
-
-        // 3. Merge processed booklets back into a single PDF
-        await MergePdfsAsync(processedBookletFiles, finalOutputPdf);
     }
 
     private bool IsFileLocked(string filePath)

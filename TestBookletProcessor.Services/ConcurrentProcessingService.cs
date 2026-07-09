@@ -1,7 +1,5 @@
-﻿using QrRegionScanner;
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -10,29 +8,6 @@ using TestBookletProcessor.Core.Interfaces;
 using TestBookletProcessor.Core.Models;
 
 namespace TestBookletProcessor.Services;
-
-/// <summary>
-/// Configuration for concurrent processing service.
-/// </summary>
-public class ConcurrentProcessingConfig
-{
-    public byte RedThreshold { get; set; } = 200;
-    public int Dpi { get; set; } = 300;
-    public bool EnableRedPixelRemover { get; set; } = true;
-    public bool EnableQrScanning { get; set; } = true;
-    public double QrRegionXInches { get; set; } = 7.0;
-    public double QrRegionYInches { get; set; } = 9.5;
-    public double QrRegionWidthInches { get; set; } = 1.5;
-    public double QrRegionHeightInches { get; set; } = 1.5;
-    public List<string> QrValuesExcludingRedRemoval { get; set; } = new();
-    public List<string> TemplateExclusionPatterns { get; set; } = new();
-    public Dictionary<string, int> ScannedSheetQrMapping { get; set; } = new();
-    public List<RedPixelExclusionRegion> RedPixelExclusionRegions { get; set; } = new();
-    public SecondaryQrScanConfig? SecondaryQrScanConfig { get; set; }
-    public RawFormExtractionConfig? RawFormExtractionConfig { get; set; }
-    public string? ScannedSheetTemplateName { get; set; }
-    public ILoggingService? LoggingService { get; set; }
-}
 
 /// <summary>
 /// Service for managing concurrent processing of multiple document files.
@@ -46,42 +21,42 @@ public class ConcurrentProcessingService : IDisposable
     private readonly SemaphoreSlim _concurrencyLimiter;
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly int _maxConcurrency;
-    private readonly ConcurrentProcessingConfig _config;
+    private readonly BookletProcessorOptions _options;
     private readonly ILoggingService? _loggingService;
-    
+
     /// <summary>
     /// Event raised when a job starts processing.
     /// </summary>
     public event EventHandler<ProcessingJobEventArgs>? JobStarted;
-    
+
     /// <summary>
     /// Event raised when a job completes successfully.
     /// </summary>
     public event EventHandler<ProcessingJobEventArgs>? JobCompleted;
-    
+
     /// <summary>
     /// Event raised when a job fails.
     /// </summary>
     public event EventHandler<ProcessingJobEventArgs>? JobFailed;
-    
+
     /// <summary>
     /// Initializes a new instance of the ConcurrentProcessingService.
     /// </summary>
-    /// <param name="config">Configuration for processing settings.</param>
-    /// <param name="maxConcurrency">Maximum number of concurrent jobs (default: 4).</param>
-    public ConcurrentProcessingService(ConcurrentProcessingConfig config, int maxConcurrency = 4)
+    /// <param name="options">Processing settings; MaxConcurrency bounds the number of parallel jobs.</param>
+    /// <param name="loggingService">Optional logging service for job events.</param>
+    public ConcurrentProcessingService(BookletProcessorOptions options, ILoggingService? loggingService = null)
     {
-        _config = config ?? throw new ArgumentNullException(nameof(config));
-        _maxConcurrency = maxConcurrency;
-        _concurrencyLimiter = new SemaphoreSlim(maxConcurrency, maxConcurrency);
-        _loggingService = config.LoggingService;
-        
+        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _loggingService = loggingService;
+        _maxConcurrency = Math.Max(1, options.MaxConcurrency);
+        _concurrencyLimiter = new SemaphoreSlim(_maxConcurrency, _maxConcurrency);
+
         Console.WriteLine($"[ConcurrentProcessor] Initialized with MaxConcurrency={_maxConcurrency}");
-        
+
         // Start background processing loop
         Task.Run(() => ProcessQueueAsync(_cancellationTokenSource.Token));
     }
-    
+
     /// <summary>
     /// Enqueues a job for processing.
     /// </summary>
@@ -97,21 +72,21 @@ public class ConcurrentProcessingService : IDisposable
             TemplateFilePath = templateFile,
             OutputFolder = outputFolder
         };
-        
+
         _jobQueue.Enqueue(job);
         Console.WriteLine($"[Queue] Job {job.JobId:N} queued: {Path.GetFileName(inputFile)}");
         Console.WriteLine($"[Queue] Jobs in queue: {_jobQueue.Count}, Active: {_activeJobs.Count}");
-        
+
         return job.JobId;
     }
-    
+
     /// <summary>
     /// Background loop that processes jobs from the queue.
     /// </summary>
     private async Task ProcessQueueAsync(CancellationToken cancellationToken)
     {
         Console.WriteLine("[Queue] Background processor started");
-        
+
         while (!cancellationToken.IsCancellationRequested)
         {
             try
@@ -122,14 +97,14 @@ public class ConcurrentProcessingService : IDisposable
                     await Task.Delay(100, cancellationToken);
                     continue;
                 }
-                
+
                 // Try to get a job
                 if (!_jobQueue.TryDequeue(out var job))
                     continue;
-                
+
                 // Wait for available slot (respects max concurrency)
                 await _concurrencyLimiter.WaitAsync(cancellationToken);
-                
+
                 // Process job in background task
                 _ = Task.Run(async () =>
                 {
@@ -141,7 +116,7 @@ public class ConcurrentProcessingService : IDisposable
                     {
                         _concurrencyLimiter.Release();
                     }
-                }, cancellationToken);
+                }, CancellationToken.None);
             }
             catch (OperationCanceledException)
             {
@@ -153,10 +128,10 @@ public class ConcurrentProcessingService : IDisposable
                 Console.WriteLine($"[Queue] Error in queue processor: {ex.Message}");
             }
         }
-        
+
         Console.WriteLine("[Queue] Background processor stopped");
     }
-    
+
     /// <summary>
     /// Processes a single job with isolated service instances.
     /// </summary>
@@ -165,128 +140,82 @@ public class ConcurrentProcessingService : IDisposable
         job.Status = ProcessingJobStatus.Processing;
         job.StartedTime = DateTime.Now;
         _activeJobs[job.JobId] = job;
-        
+
         Console.WriteLine($"[Job {job.JobId:N}] Starting: {Path.GetFileName(job.InputFilePath)}");
         JobStarted?.Invoke(this, new ProcessingJobEventArgs(job));
-        
+
         // Determine processing mode
-        string processingMode = (!string.IsNullOrEmpty(_config.ScannedSheetTemplateName) && 
-                                Path.GetFileName(job.TemplateFilePath).Equals(_config.ScannedSheetTemplateName, StringComparison.OrdinalIgnoreCase))
+        string processingMode = (!string.IsNullOrEmpty(_options.ScannedSheets.TemplateName) &&
+                                Path.GetFileName(job.TemplateFilePath).Equals(_options.ScannedSheets.TemplateName, StringComparison.OrdinalIgnoreCase))
             ? "ScannedSheets"
             : "Booklet";
-        
+
         // Log job started
         if (_loggingService != null)
         {
             await _loggingService.LogJobStartedAsync(
-                job, 
-                _config.Dpi, 
-                _config.EnableRedPixelRemover, 
-                _config.EnableQrScanning, 
+                job,
+                _options.DefaultDpi,
+                _options.EnableRedPixelRemover,
+                _options.QrScanner.EnableQrScanning,
                 processingMode);
         }
-        
+
         try
         {
-            // Wait for file to be fully written (important for FileSystemWatcher)
+            // Wait for file to be fully written (important for FileSystemWatcher);
+            // throws if the file never becomes readable
             await WaitForFileReadyAsync(job.InputFilePath, cancellationToken);
-            
-            // Create isolated service instances for this job (thread safety)
-            var pdfService = new PdfService();
-            var deskewer = new Deskewer();
-            var aligner = new ImageAlignerAlt();
-            var redPixelRemover = _config.EnableRedPixelRemover ? new RedPixelRemoverService() : null;
-            var qrScanner = _config.EnableQrScanning ? new RegionQrScanner() : null;
-            
-            // Create scanned sheet processor with isolated instances
-            IScannedSheetProcessor? scannedSheetProcessor = null;
-            if (!string.IsNullOrEmpty(_config.ScannedSheetTemplateName))
-            {
-                scannedSheetProcessor = new ScannedSheetProcessorService(
-                    pdfService,
-                    deskewer,
-                    aligner,
-                    redPixelRemover,
-                    _config.RedThreshold,
-                    qrScanner,
-                    _config.EnableQrScanning,
-                    _config.QrRegionXInches,
-                    _config.QrRegionYInches,
-                    _config.QrRegionWidthInches,
-                    _config.QrRegionHeightInches,
-                    _config.Dpi,
-                    _config.QrValuesExcludingRedRemoval,
-                    _config.RedPixelExclusionRegions,
-                    _config.SecondaryQrScanConfig,
-                    _config.RawFormExtractionConfig);
-            }
-            
-            // Create booklet processor with isolated instances
-            var bookletProcessor = new BookletProcessorService(
-                pdfService,
-                deskewer,
-                aligner,
-                redPixelRemover,
-                _config.RedThreshold,
-                _config.Dpi,
-                qrScanner,
-                _config.EnableQrScanning,
-                _config.QrRegionXInches,
-                _config.QrRegionYInches,
-                _config.QrRegionWidthInches,
-                _config.QrRegionHeightInches,
-                _config.QrValuesExcludingRedRemoval,
-                _config.TemplateExclusionPatterns,
-                scannedSheetProcessor,
-                _config.ScannedSheetTemplateName,
-                _config.ScannedSheetQrMapping);
-            
+
+            // Fresh service instances per job keep managed state isolated across parallel jobs
+            var bookletProcessor = ProcessorFactory.CreateBookletProcessor(_options, _loggingService);
+
             // Process the file
             var result = await bookletProcessor.ProcessBookletsWorkflowAsync(
                 job.InputFilePath,
                 job.TemplateFilePath,
                 job.OutputFolder,
                 null);
-            
+
             job.Result = result;
             job.Status = result.Success ? ProcessingJobStatus.Completed : ProcessingJobStatus.Failed;
             job.ErrorMessage = result.ErrorMessage;
             job.CompletedTime = DateTime.Now;
-            
+
             if (result.Success)
             {
                 var duration = job.CompletedTime.Value - job.StartedTime.Value;
                 Console.WriteLine($"[Job {job.JobId:N}] ? Completed in {duration:mm\\:ss}");
                 Console.WriteLine($"[Job {job.JobId:N}] Output: {result.OutputPath}");
-                
+
                 // Log job completed
                 if (_loggingService != null)
                 {
                     await _loggingService.LogJobCompletedAsync(
-                        job, 
-                        _config.Dpi, 
-                        _config.EnableRedPixelRemover, 
-                        _config.EnableQrScanning, 
+                        job,
+                        _options.DefaultDpi,
+                        _options.EnableRedPixelRemover,
+                        _options.QrScanner.EnableQrScanning,
                         processingMode);
                 }
-                
+
                 JobCompleted?.Invoke(this, new ProcessingJobEventArgs(job));
             }
             else
             {
                 Console.WriteLine($"[Job {job.JobId:N}] ? Failed: {result.ErrorMessage}");
-                
+
                 // Log job failed
                 if (_loggingService != null)
                 {
                     await _loggingService.LogJobFailedAsync(
-                        job, 
-                        _config.Dpi, 
-                        _config.EnableRedPixelRemover, 
-                        _config.EnableQrScanning, 
+                        job,
+                        _options.DefaultDpi,
+                        _options.EnableRedPixelRemover,
+                        _options.QrScanner.EnableQrScanning,
                         processingMode);
                 }
-                
+
                 JobFailed?.Invoke(this, new ProcessingJobEventArgs(job));
             }
         }
@@ -295,27 +224,28 @@ public class ConcurrentProcessingService : IDisposable
             job.Status = ProcessingJobStatus.Failed;
             job.ErrorMessage = ex.Message;
             job.CompletedTime = DateTime.Now;
-            
-            Console.WriteLine($"[Job {job.JobId:N}] ? Exception: {ex.Message}");
-            
-            // Log job failed
+
+            Console.WriteLine($"[Job {job.JobId:N}] ? Exception: {ex}");
+
+            // Log job failed with full exception detail
             if (_loggingService != null)
             {
+                await _loggingService.LogErrorAsync($"Job {job.JobId:N} failed for '{job.InputFilePath}'", ex);
                 await _loggingService.LogJobFailedAsync(
-                    job, 
-                    _config.Dpi, 
-                    _config.EnableRedPixelRemover, 
-                    _config.EnableQrScanning, 
+                    job,
+                    _options.DefaultDpi,
+                    _options.EnableRedPixelRemover,
+                    _options.QrScanner.EnableQrScanning,
                     processingMode);
             }
-            
+
             JobFailed?.Invoke(this, new ProcessingJobEventArgs(job));
         }
         finally
         {
             _activeJobs.TryRemove(job.JobId, out _);
             _completedJobs[job.JobId] = job;
-            
+
             // Clean up old completed jobs (keep last 100)
             if (_completedJobs.Count > 100)
             {
@@ -327,21 +257,23 @@ public class ConcurrentProcessingService : IDisposable
             }
         }
     }
-    
+
     /// <summary>
-    /// Waits for a file to be fully written and ready for processing.
+    /// Waits for a file to be fully written and ready for processing. Files often arrive
+    /// through slow channels (scanner spooling, Dropbox sync), so this waits generously
+    /// and fails the job rather than processing a partially written file.
     /// </summary>
-    private async Task WaitForFileReadyAsync(string filePath, CancellationToken cancellationToken)
+    private static async Task WaitForFileReadyAsync(string filePath, CancellationToken cancellationToken)
     {
-        const int maxAttempts = 30; // 3 seconds max
-        const int delayMs = 100;
-        
+        const int maxAttempts = 120;
+        const int delayMs = 500; // 60 seconds max
+
         for (int i = 0; i < maxAttempts; i++)
         {
             try
             {
                 // Try to open file exclusively
-                using (var stream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.None))
+                using (File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.None))
                 {
                     return; // File is ready
                 }
@@ -352,10 +284,12 @@ public class ConcurrentProcessingService : IDisposable
                 await Task.Delay(delayMs, cancellationToken);
             }
         }
-        
-        Console.WriteLine($"[Warning] File may still be writing after 3 seconds: {filePath}");
+
+        throw new TimeoutException(
+            $"File was still locked or missing after {maxAttempts * delayMs / 1000} seconds: {filePath}. " +
+            "It may still be copying; it will be processed if it is detected again.");
     }
-    
+
     /// <summary>
     /// Gets current queue statistics.
     /// </summary>
@@ -374,16 +308,19 @@ public class ConcurrentProcessingService : IDisposable
                 .ToList()
         };
     }
-    
+
     /// <summary>
-    /// Disposes of resources and stops the background processor.
+    /// Stops the background processor. In-flight jobs are allowed to finish;
+    /// queued jobs that have not started are abandoned.
     /// </summary>
     public void Dispose()
     {
         Console.WriteLine("[ConcurrentProcessor] Disposing...");
         _cancellationTokenSource.Cancel();
-        _concurrencyLimiter.Dispose();
         _cancellationTokenSource.Dispose();
+        // The semaphore is intentionally not disposed: in-flight jobs still Release() it
+        // as they finish, and SemaphoreSlim holds no unmanaged resources unless its
+        // wait handle was accessed (it never is here).
         Console.WriteLine("[ConcurrentProcessor] Disposed");
     }
 }
