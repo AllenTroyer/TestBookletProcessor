@@ -1,4 +1,4 @@
-namespace TestBookletProcessor.Core.Models;
+﻿namespace TestBookletProcessor.Core.Models;
 
 /// <summary>
 /// Configuration for scanning a secondary QR code region to extract file naming information.

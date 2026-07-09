@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Configuration;
+ï»¿using Microsoft.Extensions.Configuration;
 using QrRegionScanner;
 using System;
 using System.Collections.Generic;
@@ -318,7 +318,7 @@ partial class Program
             Console.WriteLine($"Secondary QR scan configured:");
             Console.WriteLine($"  Trigger QR: {secondaryQrScanConfig.TriggerQrCode}");
             Console.WriteLine($"  Region: ({secondaryQrScanConfig.RegionXInches}\", {secondaryQrScanConfig.RegionYInches}\") " +
-                              $"{secondaryQrScanConfig.RegionWidthInches}\" × {secondaryQrScanConfig.RegionHeightInches}\"");
+                              $"{secondaryQrScanConfig.RegionWidthInches}\" ï¿½ {secondaryQrScanConfig.RegionHeightInches}\"");
             Console.WriteLine($"  Replacement pattern: {secondaryQrScanConfig.FileNameReplacementPattern}");
             Console.WriteLine($"  Rename input files: {secondaryQrScanConfig.RenameInputFiles}");
             if (secondaryQrScanConfig.RenameInputFiles)

@@ -1,4 +1,4 @@
-namespace TestBookletProcessor.Core.Models
+﻿namespace TestBookletProcessor.Core.Models
 {
  public class FolderMonitorJobConfig
  {

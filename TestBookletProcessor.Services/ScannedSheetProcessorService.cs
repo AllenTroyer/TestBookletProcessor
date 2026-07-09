@@ -1,4 +1,4 @@
-using QrRegionScanner;
+ï»¿using QrRegionScanner;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -412,7 +412,7 @@ public class ScannedSheetProcessorService : IScannedSheetProcessor
                     Console.WriteLine($"  ? Applying {applicableRegions.Count} exclusion region(s) for QR: {qrCode}");
                     foreach (var region in applicableRegions)
                     {
-                        Console.WriteLine($"    - {region.Name}: ({region.XInches}\", {region.YInches}\") {region.WidthInches}\" × {region.HeightInches}\"");
+                        Console.WriteLine($"    - {region.Name}: ({region.XInches}\", {region.YInches}\") {region.WidthInches}\" ï¿½ {region.HeightInches}\"");
                     }
                 }
             }

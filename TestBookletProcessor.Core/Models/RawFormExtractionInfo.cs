@@ -1,4 +1,4 @@
-namespace TestBookletProcessor.Core.Models;
+﻿namespace TestBookletProcessor.Core.Models;
 
 /// <summary>
 /// Tracks information about a page that needs to be extracted as a separate file.
